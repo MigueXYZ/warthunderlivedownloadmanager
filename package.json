@@ -1,0 +1,15 @@
+{
+  "name": "warthunderlivedownloadmanager",
+  "version": "1.0.0",
+  "description": "Downloader and manager for War Thunder custom skins and sights.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "adm-zip": "^0.5.12"
+  }
+}

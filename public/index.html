@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>War Thunder Live Downloader & Manager</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+</head>
+<body class="dark-theme">
+
+  <!-- Main Grid Layout -->
+  <div class="app-container">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo-area">
+        <div class="logo-icon">✈</div>
+        <h1>WT Live<span>Manager</span></h1>
+      </div>
+      
+      <nav class="nav-menu">
+        <button class="nav-item active" id="btn-tab-browse" onclick="switchTab('browse')">
+          <span class="icon">🔍</span> Browse WT Live
+        </button>
+        <button class="nav-item" id="btn-tab-library" onclick="switchTab('library')">
+          <span class="icon">📦</span> My Library
+        </button>
+      </nav>
+
+      <!-- Telemetry companion box -->
+      <div class="telemetry-box" id="telemetry-panel">
+        <div class="telemetry-header">
+          <span class="pulse-indicator offline" id="telemetry-pulse"></span>
+          <span class="status-text" id="telemetry-status">WT Client Offline</span>
+        </div>
+        <div class="telemetry-content hidden" id="telemetry-content">
+          <p class="label">ACTIVE VEHICLE</p>
+          <h3 id="active-vehicle-name">Leopard 2A6</h3>
+          <button class="action-btn" id="btn-auto-search">🔍 Find Skins & Sights</button>
+        </div>
+        <div class="telemetry-footer" id="telemetry-footer-text">
+          Launch WT & enter test flight/match
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top Settings Bar -->
+      <header class="top-bar">
+        <div class="settings-container">
+          <div class="settings-row">
+            <div class="settings-field">
+              <label for="wt-path-input">Game Folder:</label>
+              <input type="text" id="wt-path-input" placeholder="e.g. C:\Program Files (x86)\Steam\steamapps\common\War Thunder">
+              <span class="path-status" id="path-status-msg">Checking...</span>
+            </div>
+            <div class="settings-field">
+              <label for="sights-path-input">Sights Folder:</label>
+              <input type="text" id="sights-path-input" placeholder="e.g. C:\Users\...\Documents\My Games\WarThunder\Saves\...\UserSights">
+              <span class="path-status" id="sights-status-msg">Checking...</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-field">
+              <label for="cookie-input" title="Gaijin Session Cookie (identity_sid)">Session Cookie:</label>
+              <input type="text" id="cookie-input" placeholder="Paste identity_sid cookie to unlock restricted content (Optional)">
+              <span class="path-status info" id="cookie-status-msg" style="color: var(--accent-secondary); cursor: pointer;" onclick="alert('To get your cookie:\n1. Log in to live.warthunder.com in your browser.\n2. Press F12 (DevTools) > Application (or Storage) > Cookies.\n3. Click live.warthunder.com and copy the value of the \'identity_sid\' cookie.')">❓ How to get</span>
+            </div>
+            <button class="btn-primary" id="btn-save-settings">Save Settings</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Browse Tab -->
+      <section class="tab-content active" id="tab-browse">
+        <!-- Filter and Search controls -->
+        <div class="filter-panel">
+          <div class="search-bar-wrapper">
+            <input type="text" id="search-input" placeholder="Search hashtags (e.g. #f16, #tiger) or text...">
+            <button class="search-btn" id="btn-search">Search</button>
+          </div>
+
+          <div class="controls-row">
+            <div class="control-group">
+              <label>Content Type</label>
+              <div class="toggle-buttons" id="content-toggle">
+                <button class="toggle-btn active" data-value="camouflage">Skins</button>
+                <button class="toggle-btn" data-value="sight">Sights</button>
+              </div>
+            </div>
+
+            <div class="control-group">
+              <label>Sort By</label>
+              <select id="sort-select">
+                <option value="downloads" selected>Most Downloaded</option>
+                <option value="rating">Popular (Likes)</option>
+                <option value="comments">Most Commented</option>
+                <option value="created">Recent</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid Results -->
+        <div class="results-grid" id="results-grid">
+          <!-- Dynamically populated cards -->
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination-panel hidden" id="pagination-panel">
+          <button class="btn-secondary" id="btn-prev-page" disabled>Previous Page</button>
+          <span class="page-indicator" id="page-indicator">Page 1</span>
+          <button class="btn-secondary" id="btn-next-page">Next Page</button>
+        </div>
+      </section>
+
+      <!-- Library Tab -->
+      <section class="tab-content" id="tab-library">
+        <div class="library-header">
+          <h2>Installed Modifications</h2>
+          <button class="btn-secondary" onclick="loadLibrary()">🔄 Refresh Library</button>
+        </div>
+
+        <div class="library-columns">
+          <!-- Skins Column -->
+          <div class="library-col">
+            <h3>Skins <span class="badge" id="count-skins">0</span></h3>
+            <div class="list-container" id="skins-list">
+              <!-- Skins list items -->
+            </div>
+          </div>
+
+          <!-- Sights Column -->
+          <div class="library-col">
+            <h3>Sights <span class="badge" id="count-sights">0</span></h3>
+            <div class="list-container" id="sights-list">
+              <!-- Sights list items -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Global Loader Overlay -->
+  <div class="overlay hidden" id="install-overlay">
+    <div class="overlay-card">
+      <div class="spinner"></div>
+      <h3 id="overlay-title">Installing Modification...</h3>
+      <p id="overlay-desc">Downloading ZIP file from WT Live and extracting it into your game directory.</p>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Fullscreen Image Lightbox -->
+  <div class="overlay hidden" id="lightbox-overlay" onclick="closeLightbox()">
+    <span class="close-btn">&times;</span>
+    <img id="lightbox-img" src="" alt="Fullscreen Preview" onclick="event.stopPropagation()">
+  </div>
+
+  <script src="index.js"></script>
+</body>
+</html>
