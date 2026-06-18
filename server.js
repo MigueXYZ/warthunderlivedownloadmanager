@@ -303,8 +303,44 @@ app.post('/api/download', async (req, res) => {
       fs.mkdirSync(targetBaseDir, { recursive: true });
     }
 
-    // Smart Extraction:
-    // Check if the zip already has a root folder or if it dumps files directly.
+    // Special Extraction for Sights:
+    if (type === 'sight') {
+      const blkEntries = entries.filter(entry => !entry.isDirectory && entry.entryName.toLowerCase().endsWith('.blk'));
+      
+      if (blkEntries.length === 0) {
+        throw new Error('No .blk sight files found in the download ZIP archive.');
+      }
+      
+      const cleanZipName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
+      const modSightsDir = path.join(settings.sightsPath, cleanZipName, 'all_tanks');
+      
+      if (!fs.existsSync(modSightsDir)) {
+        fs.mkdirSync(modSightsDir, { recursive: true });
+      }
+
+      const installedFiles = [];
+
+      for (const entry of blkEntries) {
+        const entryData = entry.getData();
+        const originalFileName = path.basename(entry.entryName);
+        
+        const finalDestPath = path.join(modSightsDir, originalFileName);
+        console.log(`Extracting sight file to: ${finalDestPath}`);
+        fs.writeFileSync(finalDestPath, entryData);
+        installedFiles.push(originalFileName);
+      }
+      
+      // Delete temp zip file
+      fs.unlinkSync(tempZipPath);
+
+      return res.json({
+        success: true,
+        message: `Sight installed successfully! Extracted ${blkEntries.length} sight file(s) into ${cleanZipName}/all_tanks/`,
+        folder: cleanZipName
+      });
+    }
+
+    // Smart Extraction (for skins):
     let hasRootFiles = false;
     let rootFolders = new Set();
 
@@ -428,27 +464,27 @@ app.get('/api/installed', (req, res) => {
 
   // Read UserSights
   if (settings.sightsPath && fs.existsSync(settings.sightsPath)) {
-    const sightsDir = path.join(settings.sightsPath, 'all_tanks');
+    const sightsDir = settings.sightsPath;
     if (fs.existsSync(sightsDir)) {
       const files = fs.readdirSync(sightsDir);
       for (const file of files) {
         const fullPath = path.join(sightsDir, file);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
-          const subfiles = fs.readdirSync(fullPath);
-          installedSights.push({
-            name: file,
-            path: fullPath,
-            installedAt: stat.mtime,
-            filesCount: subfiles.length
-          });
-        } else if (file.endsWith('.blk')) {
-          installedSights.push({
-            name: file,
-            path: fullPath,
-            installedAt: stat.mtime,
-            isFile: true
-          });
+          // Check if it has a subfolder 'all_tanks'
+          const allTanksDir = path.join(fullPath, 'all_tanks');
+          if (fs.existsSync(allTanksDir) && fs.statSync(allTanksDir).isDirectory()) {
+            const subfiles = fs.readdirSync(allTanksDir);
+            const blkFiles = subfiles.filter(f => f.toLowerCase().endsWith('.blk'));
+            if (blkFiles.length > 0) {
+              installedSights.push({
+                name: file, // Name of the mod folder
+                path: fullPath,
+                installedAt: stat.mtime,
+                filesCount: blkFiles.length
+              });
+            }
+          }
         }
       }
     }
@@ -475,7 +511,7 @@ app.delete('/api/installed', (req, res) => {
     folderPath = path.join(settings.wtPath, 'UserSkins', name);
   } else if (type === 'sight') {
     if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
-    folderPath = path.join(settings.sightsPath, 'all_tanks', name);
+    folderPath = path.join(settings.sightsPath, name);
   } else {
     return res.status(400).json({ error: 'Invalid type' });
   }

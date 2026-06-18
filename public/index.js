@@ -3,6 +3,8 @@ const state = {
   activeTab: 'browse',
   contentType: 'camouflage', // 'camouflage' or 'sight'
   searchString: '',
+  country: 'all',
+  vehicleType: 'all',
   sort: 'downloads',
   page: 0,
   installedList: { skins: [], sights: [] },
@@ -24,6 +26,10 @@ const elements = {
   searchInput: document.getElementById('search-input'),
   btnSearch: document.getElementById('btn-search'),
   contentToggleButtons: document.querySelectorAll('#content-toggle .toggle-btn'),
+  countrySelect: document.getElementById('country-select'),
+  vehicleTypeSelect: document.getElementById('vehicle-type-select'),
+  countryFilterGroup: document.getElementById('country-filter-group'),
+  vehicleTypeFilterGroup: document.getElementById('vehicle-type-filter-group'),
   sortSelect: document.getElementById('sort-select'),
   resultsGrid: document.getElementById('results-grid'),
   
@@ -62,6 +68,7 @@ const elements = {
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   loadLibrary();
+  updateFilterVisibility();
   fetchFeed();
   
   // Start telemetry polling
@@ -98,8 +105,23 @@ function setupEventListeners() {
       e.target.classList.add('active');
       state.contentType = e.target.getAttribute('data-value');
       state.page = 0;
+      updateFilterVisibility();
       fetchFeed();
     });
+  });
+
+  // Country Selection
+  elements.countrySelect.addEventListener('change', (e) => {
+    state.country = e.target.value;
+    state.page = 0;
+    fetchFeed();
+  });
+
+  // Vehicle Type Selection
+  elements.vehicleTypeSelect.addEventListener('change', (e) => {
+    state.vehicleType = e.target.value;
+    state.page = 0;
+    fetchFeed();
   });
   
   // Sort Selection
@@ -129,6 +151,13 @@ function setupEventListeners() {
       const cleanName = formatVehicleForSearch(state.activeVehicle);
       elements.searchInput.value = cleanName;
       state.searchString = cleanName;
+      
+      // Reset filters so that we search globally for the active vehicle
+      elements.countrySelect.value = 'all';
+      elements.vehicleTypeSelect.value = 'all';
+      state.country = 'all';
+      state.vehicleType = 'all';
+      
       state.page = 0;
       switchTab('browse');
       fetchFeed();
@@ -267,6 +296,8 @@ async function fetchFeed() {
     </div>
   `;
   
+  const apiQuery = getQueryStringForAPI();
+  
   try {
     const res = await fetch('/api/feed', {
       method: 'POST',
@@ -275,14 +306,37 @@ async function fetchFeed() {
         content: state.contentType,
         sort: state.sort,
         page: state.page,
-        searchString: state.searchString
+        searchString: apiQuery
       })
     });
     
     const data = await res.json();
     
     if (data.status === 'OK' && data.data && data.data.list) {
-      renderCards(data.data.list);
+      // Filter list based on country and vehicle type (only for camouflage/skins)
+      const filteredList = data.data.list.filter(item => {
+        if (state.contentType !== 'camouflage') return true;
+        
+        const classification = classifyItem(item);
+        
+        // Country filter
+        if (state.country && state.country !== 'all') {
+          if (classification.country !== state.country) {
+            return false;
+          }
+        }
+        
+        // Vehicle type filter
+        if (state.vehicleType && state.vehicleType !== 'all') {
+          if (classification.type !== state.vehicleType) {
+            return false;
+          }
+        }
+        
+        return true;
+      });
+      
+      renderCards(filteredList);
       
       // Update pagination
       elements.paginationPanel.classList.remove('hidden');
@@ -652,4 +706,157 @@ function showToast(message, type = 'info') {
       toast.remove();
     }, 300);
   }, 4000);
+}
+
+// Helpers for searching and filtering
+function getQueryStringForAPI() {
+  if (state.searchString) {
+    return state.searchString;
+  }
+  
+  if (state.contentType === 'camouflage') {
+    if (state.country && state.country !== 'all') {
+      return '#' + state.country;
+    }
+    if (state.vehicleType && state.vehicleType !== 'all') {
+      if (state.vehicleType === 'ground') return '#tank';
+      if (state.vehicleType === 'air') return '#plane';
+      if (state.vehicleType === 'naval') return '#ship';
+    }
+  }
+  return '';
+}
+
+function updateFilterVisibility() {
+  if (state.contentType === 'camouflage') {
+    elements.countryFilterGroup.classList.remove('hidden');
+    elements.vehicleTypeFilterGroup.classList.remove('hidden');
+  } else {
+    elements.countryFilterGroup.classList.add('hidden');
+    elements.vehicleTypeFilterGroup.classList.add('hidden');
+  }
+}
+
+function classifyItem(item) {
+  const descLower = (item.description || '').toLowerCase();
+  const fileLower = (item.file && item.file.name ? item.file.name.toLowerCase() : '');
+  const combinedText = `${descLower} ${fileLower}`;
+  
+  // 1. Identify Country
+  const countries = ['usa', 'germany', 'ussr', 'uk', 'japan', 'italy', 'france', 'china', 'sweden', 'israel'];
+  const countryScores = {};
+  countries.forEach(c => countryScores[c] = 0);
+  
+  // USA clues
+  if (combinedText.includes('#usa') || combinedText.includes('#usaf') || combinedText.includes('#usn') || combinedText.includes('#usmc') || combinedText.includes('#america')) countryScores.usa += 15;
+  if (/\busa\b|\busmc\b|\busaf\b|\bamerican\b|\bunited states\b|\bus navy\b|\bus air force\b/.test(combinedText)) countryScores.usa += 8;
+  if (/\bm1a[12]\b|\babrams\b|\bf-14\b|\bf14\b|\bf-15\b|\bf15\b|\bf-16\b|\bf16\b|\bf-18\b|\bf18\b|\bp-51\b|\bp51\b|\bp-47\b|\bp47\b|\ba-10\b|\ba10\b|\bf4u\b|\bhellcat\b|\bwildcat\b|\bbearcat\b|\bpatton\b/.test(combinedText)) countryScores.usa += 10;
+  
+  // Germany clues
+  if (combinedText.includes('#germany') || combinedText.includes('#german') || combinedText.includes('#luftwaffe') || combinedText.includes('#bundeswehr') || combinedText.includes('#wehrmacht')) countryScores.germany += 15;
+  if (/\bgermany\b|\bgerman\b|\bluftwaffe\b|\bbundeswehr\b|\bwehrmacht\b|\bheer\b|\bdeutschland\b/.test(combinedText)) countryScores.germany += 8;
+  if (/\btiger\b|\bpanther\b|\bleopard\b|\bstug\b|\bbf[- ]?109\b|\bfw[- ]?190\b|\bju[- ]?87\b|\bhe[- ]?111\b|\bme[- ]?262\b|\bdo[- ]?335\b|\bta[- ]?152\b|\bpanzer\b|\bpz\b/.test(combinedText)) countryScores.germany += 10;
+  
+  // USSR clues
+  if (combinedText.includes('#ussr') || combinedText.includes('#soviet') || combinedText.includes('#russian') || combinedText.includes('#russia') || combinedText.includes('#vvs')) countryScores.ussr += 15;
+  if (/\bussr\b|\bsoviet\b|\brussian\b|\brussia\b|\bvvs\b|\brkka\b/.test(combinedText)) countryScores.ussr += 8;
+  if (/\bmig[-_]?\d+\b|\bsu[-_]?(?:17|22|24|25|27|30|33|39|57)\b|\byak[-_]?\d+\b|\bla[-_]?\d+\b|\bil[-_]?\d+\b|\bt[- ]?34\b|\bt[- ]?54\b|\bt[- ]?55\b|\bt[- ]?62\b|\bt[- ]?64\b|\bt[- ]?72\b|\bt[- ]?80\b|\bt[- ]?90\b|\bis[- ]?[12347]\b|\bkv[- ]?[12]\b|\bbmp[-_]?\d+\b/.test(combinedText)) countryScores.ussr += 10;
+  
+  // UK clues
+  if (combinedText.includes('#uk') || combinedText.includes('#britain') || combinedText.includes('#british') || combinedText.includes('#raf') || combinedText.includes('#royalnavy')) countryScores.uk += 15;
+  if (/\buk\b|\bbritain\b|\bbritish\b|\broyal air force\b|\broyal navy\b|\braf\b/.test(combinedText)) countryScores.uk += 8;
+  if (/\bspitfire\b|\bhurricane\b|\btempest\b|\btyphoon\b|\bmeteor\b|\bharrier\b|\blightning\b|\bvulcan\b|\bhunter\b|\bchallenger\b|\bchieftain\b|\bcenturion\b|\bchurchill\b/.test(combinedText)) countryScores.uk += 10;
+  
+  // Japan clues
+  if (combinedText.includes('#japan') || combinedText.includes('#japanese') || combinedText.includes('#jasdf') || combinedText.includes('#jgsdf') || combinedText.includes('#jmsdf')) countryScores.japan += 15;
+  if (/\bjapan\b|\bjapanese\b|\bjasdf\b|\bjgsdf\b|\bjmsdf\b/.test(combinedText)) countryScores.japan += 8;
+  if (/\bzero\b|\ba6m\b|\bki[-_]?\d+\b|\bn1k\b|\btype[- ]?90\b|\btype[- ]?10\b|\btype[- ]?74\b|\btype[- ]?16\b/.test(combinedText)) countryScores.japan += 10;
+
+  // Italy clues
+  if (combinedText.includes('#italy') || combinedText.includes('#italian')) countryScores.italy += 15;
+  if (/\bitaly\b|\bitalian\b|\bregia aeronautica\b/.test(combinedText)) countryScores.italy += 8;
+  if (/\bcentauro\b|\bariete\b|\bfiat\b|\bmacchi\b|\bbreda\b/.test(combinedText)) countryScores.italy += 10;
+
+  // France clues
+  if (combinedText.includes('#france') || combinedText.includes('#french') || combinedText.includes('#aeronavale')) countryScores.france += 15;
+  if (/\bfrance\b|\bfrench\b|\barmee de l'air\b/.test(combinedText)) countryScores.france += 8;
+  if (/\bleclerc\b|\bmirage\b|\brafale\b|\bamx\b/.test(combinedText)) countryScores.france += 10;
+
+  // China clues
+  if (combinedText.includes('#china') || combinedText.includes('#chinese') || combinedText.includes('#pla') || combinedText.includes('#plaf') || combinedText.includes('#taiwan') || combinedText.includes('#rocaf')) countryScores.china += 15;
+  if (/\bchina\b|\bchinese\b|\btaiwan\b|\bpla\b|\bplaf\b/.test(combinedText)) countryScores.china += 8;
+  if (/\bztz\b|\bj[-_]?[789101115]\b|\bq[-_]?5\b/.test(combinedText)) countryScores.china += 10;
+
+  // Sweden clues
+  if (combinedText.includes('#sweden') || combinedText.includes('#swedish') || combinedText.includes('#finland') || combinedText.includes('#finnish')) countryScores.sweden += 15;
+  if (/\bsweden\b|\bswedish\b|\bfinland\b|\bfinnish\b/.test(combinedText)) countryScores.sweden += 8;
+  if (/\bstrv\b|\bgripen\b|\bviggen\b|\bdraken\b|\blansen\b/.test(combinedText)) countryScores.sweden += 10;
+
+  // Israel clues
+  if (combinedText.includes('#israel') || combinedText.includes('#israeli') || combinedText.includes('#iaf') || combinedText.includes('#idf')) countryScores.israel += 15;
+  if (/\bisrael\b|\bisraeli\b|\biaf\b|\bidf\b/.test(combinedText)) countryScores.israel += 8;
+  if (/\bmerkava\b|\bkfir\b|\blavi\b/.test(combinedText)) countryScores.israel += 10;
+
+  // Determine highest country score
+  let detectedCountry = 'unknown';
+  let maxCountryScore = 0;
+  countries.forEach(c => {
+    if (countryScores[c] > maxCountryScore) {
+      maxCountryScore = countryScores[c];
+      detectedCountry = c;
+    }
+  });
+
+  // 2. Identify Vehicle Type
+  let detectedType = 'unknown';
+  
+  if (item.type === 'sight') {
+    detectedType = 'ground'; // Sights are always ground
+  } else {
+    const typeScores = { ground: 0, air: 0, naval: 0 };
+    
+    // Air keywords/hashtags
+    if (combinedText.includes('#plane') || combinedText.includes('#planes') || combinedText.includes('#aircraft') || combinedText.includes('#jet') || combinedText.includes('#jets') || combinedText.includes('#helicopter') || combinedText.includes('#helicopters') || combinedText.includes('#aviation') || combinedText.includes('#interceptor') || combinedText.includes('#bomber') || combinedText.includes('#fighter')) {
+      typeScores.air += 15;
+    }
+    if (/\bplane\b|\bplanes\b|\baircraft\b|\bjet\b|\bjets\b|\bhelicopter\b|\bhelicopters\b|\baviation\b|\bfighter\b|\bbomber\b|\binterceptor\b/.test(combinedText)) {
+      typeScores.air += 8;
+    }
+    if (/\bspitfire\b|\bbf[- ]?109\b|\bfw[- ]?190\b|\bju[- ]?87\b|\bhe[- ]?111\b|\bme[- ]?262\b|\bdo[- ]?335\b|\bta[- ]?152\b|\bp[- ]?51\b|\bp[- ]?47\b|\bp[- ]?38\b|\ba[- ]?10\b|\bf[- ]?4\b|\bf[- ]?14\b|\bf[- ]?15\b|\bf[- ]?16\b|\bf[- ]?18\b|\bmig[-_]?\d+\b|\bsu[-_]?(?:17|22|24|25|27|30|33|39|57)\b|\byak[-_]?\d+\b|\bla[-_]?\d+\b|\bil[-_]?\d+\b|\btu[-_]?\d+\b|\bgripen\b|\bviggen\b|\bdraken\b|\bmirage\b|\brafale\b|\bzero\b|\ba6m\b|\bki[-_]?\d+\b/.test(combinedText)) {
+      typeScores.air += 10;
+    }
+    
+    // Naval keywords/hashtags
+    if (combinedText.includes('#ship') || combinedText.includes('#ships') || combinedText.includes('#boat') || combinedText.includes('#boats') || combinedText.includes('#naval') || combinedText.includes('#navy') || combinedText.includes('#fleet') || combinedText.includes('#destroyer') || combinedText.includes('#cruiser') || combinedText.includes('#battleship') || combinedText.includes('#frigate')) {
+      typeScores.naval += 15;
+    }
+    if (/\bship\b|\bships\b|\bboat\b|\bboats\b|\bnaval\b|\bnavy\b|\bfleet\b|\bdestroyer\b|\bcruiser\b|\bbattleship\b|\bfrigate\b/.test(combinedText)) {
+      typeScores.naval += 8;
+    }
+    if (/\bkms\s|\buss\s|\bhms\s|\bijn\s|\bprinz eugen\b|\bbismarck\b|\byamato\b|\btirpitz\b/.test(combinedText)) {
+      typeScores.naval += 10;
+    }
+
+    // Ground keywords/hashtags
+    if (combinedText.includes('#tank') || combinedText.includes('#tanks') || combinedText.includes('#ground') || combinedText.includes('#panzer') || combinedText.includes('#spg') || combinedText.includes('#sam') || combinedText.includes('#ifv') || combinedText.includes('#apc') || combinedText.includes('#armor') || combinedText.includes('#armored') || combinedText.includes('#spaa')) {
+      typeScores.ground += 15;
+    }
+    if (/\btank\b|\btanks\b|\bground\b|\bpanzer\b|\bspg\b|\bifv\b|\bapc\b|\barmor\b|\barmored\b|\bspaa\b/.test(combinedText)) {
+      typeScores.ground += 8;
+    }
+    if (/\btiger\b|\bpanther\b|\bleopard\b|\babrams\b|\bm1a[12]\b|\bt[- ]?34\b|\bt[- ]?54\b|\bt[- ]?55\b|\bt[- ]?62\b|\bt[- ]?64\b|\bt[- ]?72\b|\bt[- ]?80\b|\bt[- ]?90\b|\bstrv\b|\bchallenger\b|\bchieftain\b|\bcenturion\b|\bsherman\b|\bstug\b|\bhetzer\b|\bjagdpanther\b|\bjagdtiger\b|\bmaus\b|\bbmp[-_]?\d+\b|\bpanzer[-_]?\w+\b|\bpz[-_]?\w+\b/.test(combinedText)) {
+      typeScores.ground += 10;
+    }
+
+    // Determine highest category score
+    let maxTypeScore = 0;
+    Object.keys(typeScores).forEach(t => {
+      if (typeScores[t] > maxTypeScore) {
+        maxTypeScore = typeScores[t];
+        detectedType = t;
+      }
+    });
+  }
+
+  return { country: detectedCountry, type: detectedType };
 }

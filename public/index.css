@@ -438,7 +438,8 @@ button {
 
 .controls-row {
   display: flex;
-  gap: 32px;
+  gap: 24px;
+  flex-wrap: wrap;
   align-items: center;
 }
 
