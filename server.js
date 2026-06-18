@@ -167,7 +167,7 @@ app.post('/api/settings', (req, res) => {
 
 // API: Proxy request to live.warthunder.com search feed
 app.post('/api/feed', async (req, res) => {
-  const { content, sort, page, searchString } = req.body;
+  const { content, sort, page, searchString, vehicle } = req.body;
   const settings = loadSettings();
 
   try {
@@ -177,6 +177,9 @@ app.post('/api/feed', async (req, res) => {
     params.append('page', page || '0');
     if (searchString) {
       params.append('searchString', searchString);
+    }
+    if (vehicle) {
+      params.append('vehicle', vehicle);
     }
 
     const headers = {
@@ -236,7 +239,7 @@ async function downloadFile(url, destPath, cookie) {
 
 // API: Trigger download and installation of a skin/sight
 app.post('/api/download', async (req, res) => {
-  const { url, type, name, lang_group } = req.body;
+  const { url, type, name, lang_group, postId } = req.body;
   const settings = loadSettings();
 
   if (type === 'camouflage' && (!settings.wtPath || !fs.existsSync(settings.wtPath))) {
@@ -333,6 +336,27 @@ app.post('/api/download', async (req, res) => {
       // Delete temp zip file
       fs.unlinkSync(tempZipPath);
 
+      // Write metadata file
+      const metadataFolder = path.join(settings.sightsPath, cleanZipName);
+      if (fs.existsSync(metadataFolder)) {
+        try {
+          const metadata = {
+            postId: postId ? parseInt(postId, 10) : null,
+            lang_group: lang_group ? parseInt(lang_group, 10) : null,
+            fileName: name,
+            type,
+            installedAt: Date.now()
+          };
+          fs.writeFileSync(
+            path.join(metadataFolder, '.wtlive.json'),
+            JSON.stringify(metadata, null, 2),
+            'utf8'
+          );
+        } catch (err) {
+          console.error('Error writing metadata file:', err);
+        }
+      }
+
       return res.json({
         success: true,
         message: `Sight installed successfully! Extracted ${blkEntries.length} sight file(s) into ${cleanZipName}/all_tanks/`,
@@ -418,6 +442,27 @@ app.post('/api/download', async (req, res) => {
     // Delete temp zip file
     fs.unlinkSync(tempZipPath);
 
+    // Write metadata file
+    const metadataFolder = path.join(targetBaseDir, createdFolder);
+    if (fs.existsSync(metadataFolder)) {
+      try {
+        const metadata = {
+          postId: postId ? parseInt(postId, 10) : null,
+          lang_group: lang_group ? parseInt(lang_group, 10) : null,
+          fileName: name,
+          type,
+          installedAt: Date.now()
+        };
+        fs.writeFileSync(
+          path.join(metadataFolder, '.wtlive.json'),
+          JSON.stringify(metadata, null, 2),
+          'utf8'
+        );
+      } catch (err) {
+        console.error('Error writing metadata file:', err);
+      }
+    }
+
     res.json({
       success: true,
       message: `${type === 'camouflage' ? 'Skin' : 'Sight'} installed successfully!`,
@@ -449,13 +494,19 @@ app.get('/api/installed', (req, res) => {
         const fullPath = path.join(skinsDir, file);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
-          const subfiles = fs.readdirSync(fullPath);
-          const hasBlk = subfiles.some(f => f.endsWith('.blk'));
+          let metadata = null;
+          const metaPath = path.join(fullPath, '.wtlive.json');
+          if (fs.existsSync(metaPath)) {
+            try {
+              metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+            } catch (_) {}
+          }
           installedSkins.push({
             name: file,
             path: fullPath,
             installedAt: stat.mtime,
-            hasBlk
+            hasBlk,
+            metadata
           });
         }
       }
@@ -475,13 +526,20 @@ app.get('/api/installed', (req, res) => {
           const allTanksDir = path.join(fullPath, 'all_tanks');
           if (fs.existsSync(allTanksDir) && fs.statSync(allTanksDir).isDirectory()) {
             const subfiles = fs.readdirSync(allTanksDir);
-            const blkFiles = subfiles.filter(f => f.toLowerCase().endsWith('.blk'));
+            let metadata = null;
+            const metaPath = path.join(fullPath, '.wtlive.json');
+            if (fs.existsSync(metaPath)) {
+              try {
+                metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+              } catch (_) {}
+            }
             if (blkFiles.length > 0) {
               installedSights.push({
                 name: file, // Name of the mod folder
                 path: fullPath,
                 installedAt: stat.mtime,
-                filesCount: blkFiles.length
+                filesCount: blkFiles.length,
+                metadata
               });
             }
           }

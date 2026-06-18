@@ -3,6 +3,7 @@ const state = {
   activeTab: 'browse',
   contentType: 'camouflage', // 'camouflage' or 'sight'
   searchString: '',
+  vehicle: '', // Selected vehicle for filtering (using official vehicle ID)
   country: 'all',
   vehicleType: 'all',
   sort: 'downloads',
@@ -11,7 +12,8 @@ const state = {
   wtPathValid: false,
   sightsPathValid: false,
   telemetryActive: false,
-  activeVehicle: ''
+  activeVehicle: '',
+  hideUniversal: false // Hide universal skins if searching a specific vehicle
 };
 
 // DOM Elements
@@ -31,6 +33,8 @@ const elements = {
   countryFilterGroup: document.getElementById('country-filter-group'),
   vehicleTypeFilterGroup: document.getElementById('vehicle-type-filter-group'),
   sortSelect: document.getElementById('sort-select'),
+  hideUniversalCheckbox: document.getElementById('hide-universal-checkbox'),
+  universalFilterGroup: document.getElementById('universal-filter-group'),
   resultsGrid: document.getElementById('results-grid'),
   
   paginationPanel: document.getElementById('pagination-panel'),
@@ -86,6 +90,7 @@ function setupEventListeners() {
   // Search
   elements.btnSearch.addEventListener('click', () => {
     state.searchString = elements.searchInput.value.trim();
+    state.vehicle = ''; // Reset vehicle ID filter on manual search
     state.page = 0;
     fetchFeed();
   });
@@ -93,6 +98,7 @@ function setupEventListeners() {
   elements.searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       state.searchString = elements.searchInput.value.trim();
+      state.vehicle = ''; // Reset vehicle ID filter on manual search
       state.page = 0;
       fetchFeed();
     }
@@ -131,6 +137,12 @@ function setupEventListeners() {
     fetchFeed();
   });
   
+  // Hide Universal Selection
+  elements.hideUniversalCheckbox.addEventListener('change', (e) => {
+    state.hideUniversal = e.target.checked;
+    fetchFeed();
+  });
+  
   // Pagination
   elements.btnPrevPage.addEventListener('click', () => {
     if (state.page > 0) {
@@ -147,10 +159,10 @@ function setupEventListeners() {
   // Telemetry auto-search
   elements.btnAutoSearch.addEventListener('click', () => {
     if (state.activeVehicle) {
-      // Clean vehicle name for searching
-      const cleanName = formatVehicleForSearch(state.activeVehicle);
-      elements.searchInput.value = cleanName;
-      state.searchString = cleanName;
+      // Use the cleaned active vehicle ID directly for WT Live's vehicle filter
+      state.vehicle = state.activeVehicle;
+      state.searchString = ''; // Clear hashtag search when vehicle parameter is active
+      elements.searchInput.value = formatVehicleDisplayName(state.activeVehicle);
       
       // Reset filters so that we search globally for the active vehicle
       elements.countrySelect.value = 'all';
@@ -163,19 +175,60 @@ function setupEventListeners() {
       fetchFeed();
     }
   });
+
+  // Lightbox zoom on mousewheel
+  elements.lightboxImg.addEventListener('wheel', (e) => {
+    if (!state.lightbox) return;
+    e.preventDefault();
+    const amount = e.deltaY < 0 ? 0.15 : -0.15;
+    state.lightbox.scale = Math.max(0.5, Math.min(4, state.lightbox.scale + amount));
+    updateLightboxTransform();
+  }, { passive: false });
+
+  // Lightbox drag and pan
+  elements.lightboxImg.addEventListener('mousedown', (e) => {
+    if (!state.lightbox || state.lightbox.scale <= 1) return;
+    state.lightbox.isDragging = true;
+    elements.lightboxImg.style.cursor = 'grabbing';
+    state.lightbox.startX = e.clientX - state.lightbox.translateX;
+    state.lightbox.startY = e.clientY - state.lightbox.translateY;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!state.lightbox || !state.lightbox.isDragging) return;
+    state.lightbox.translateX = e.clientX - state.lightbox.startX;
+    state.lightbox.translateY = e.clientY - state.lightbox.startY;
+    updateLightboxTransform();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (state.lightbox && state.lightbox.isDragging) {
+      state.lightbox.isDragging = false;
+      elements.lightboxImg.style.cursor = 'grab';
+    }
+  });
 }
 
-// Format WT Internal vehicle names to standard search text
+// Format WT Internal CDK vehicle names to a clean hashtag for WT Live search
 function formatVehicleForSearch(vehicleName) {
   let cleaned = vehicleName.toLowerCase();
   
-  // Remove common suffixes
+  // 1. Remove country prefixes
+  cleaned = cleaned.replace(/^(us|usa|germ|germany|ussr|su|uk|britain|jp|japan|it|italy|fr|france|cn|china|swe|sweden|il|israel)_/, '');
+  
+  // 2. Remove common country suffixes
   cleaned = cleaned.replace(/_(germany|usa|ussr|uk|japan|italy|france|china|sweden|israel)$/g, '');
   
-  // Replace underscores with spaces
-  cleaned = cleaned.replace(/_/g, ' ');
+  // 3. Remove common minor suffixes
+  cleaned = cleaned.replace(/_(shop|default|late|early|1944|1943|1942|1941|1945)$/g, '');
   
-  return cleaned;
+  // 4. Remove block versions or minor suffixes (like block_50, block_15, a_e, etc. if they are part of a long name)
+  cleaned = cleaned.replace(/_block_\d+/g, '');
+
+  // 5. Generate hashtag by removing all underscores and prefixing with #
+  const hashtag = '#' + cleaned.replace(/_/g, '');
+  
+  return hashtag;
 }
 
 // Switch Tab
@@ -306,17 +359,36 @@ async function fetchFeed() {
         content: state.contentType,
         sort: state.sort,
         page: state.page,
-        searchString: apiQuery
+        searchString: apiQuery,
+        vehicle: state.vehicle
       })
     });
     
     const data = await res.json();
     
     if (data.status === 'OK' && data.data && data.data.list) {
-      // Filter list based on country and vehicle type (only for camouflage/skins)
+      // Filter list based on country, vehicle type, and universal checkbox (only for camouflage/skins)
       const filteredList = data.data.list.filter(item => {
         if (state.contentType !== 'camouflage') return true;
         
+        // Hide Universal filter (if checked, hide skins that match universal patterns)
+        if (state.hideUniversal) {
+          const descLower = (item.description || '').toLowerCase();
+          const fileLower = (item.file && item.file.name ? item.file.name.toLowerCase() : '');
+          
+          if (
+            descLower.includes('#universal') ||
+            descLower.includes('universal') ||
+            fileLower.includes('universal') ||
+            descLower.includes('for all tanks') ||
+            descLower.includes('all tanks') ||
+            descLower.includes('camo pack') ||
+            descLower.includes('color pack')
+          ) {
+            return false;
+          }
+        }
+
         const classification = classifyItem(item);
         
         // Country filter
@@ -353,6 +425,74 @@ async function fetchFeed() {
   }
 }
 
+// Helper to extract a readable post title from description HTML, falling back to the filename
+function cleanFilename(filename) {
+  if (!filename) return 'Unnamed Modification';
+  return filename
+    .replace(/\.(zip|rar|tar|gz)$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/%20/g, ' ')
+    .trim();
+}
+
+function getPostTitle(item) {
+  if (!item.description) {
+    return cleanFilename(item.file.name);
+  }
+
+  // Use DOMParser since this runs in the browser
+  const doc = new DOMParser().parseFromString(item.description, 'text/html');
+
+  // 1. Try to find content in <b> or <strong> tags first, which is typically the title
+  const boldElement = doc.querySelector('b, strong, h1, h2, h3, h4');
+  let titleCandidate = '';
+  if (boldElement) {
+    titleCandidate = boldElement.textContent.trim();
+  }
+
+  // 2. If bold/heading is too short or doesn't exist, try the first text line
+  if (!titleCandidate || titleCandidate.length < 3) {
+    const textContent = doc.body.textContent || '';
+    const lines = textContent.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length > 0) {
+      titleCandidate = lines[0];
+    }
+  }
+
+  // Clean the candidate: remove hashtags and normalize spaces
+  if (titleCandidate) {
+    titleCandidate = titleCandidate
+      .replace(/#[a-zA-Z0-9_\-\/]+/g, '') // remove hashtags
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Skip lines that are just generic tags like "[PBR READY]" or "[UPDATE]"
+  if (titleCandidate) {
+    const lower = titleCandidate.toLowerCase();
+    if (lower === 'pbr ready' || lower === '[pbr ready]' || lower === 'update' || lower === '[update]') {
+      // Try to get next paragraph/line if available
+      const textContent = doc.body.textContent || '';
+      const lines = textContent.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      for (const line of lines) {
+        const cleanedLine = line.replace(/#[a-zA-Z0-9_\-\/]+/g, '').replace(/\s+/g, ' ').trim();
+        const lowerLine = cleanedLine.toLowerCase();
+        if (cleanedLine.length >= 3 && lowerLine !== 'pbr ready' && lowerLine !== '[pbr ready]' && lowerLine !== 'update' && lowerLine !== '[update]') {
+          titleCandidate = cleanedLine;
+          break;
+        }
+      }
+    }
+  }
+
+  // Validate candidate length. If it's valid, return it.
+  if (titleCandidate && titleCandidate.length >= 3 && titleCandidate.length <= 100) {
+    return titleCandidate;
+  }
+
+  return cleanFilename(item.file.name);
+}
+
 // Render Results Grid
 function renderCards(list) {
   elements.resultsGrid.innerHTML = '';
@@ -375,13 +515,10 @@ function renderCards(list) {
     
     const imageUrl = (item.images && item.images.length > 0) ? item.images[0].src : 'https://placehold.co/600x400/111317/fff?text=No+Preview';
     
-    const isInstalled = isModInstalled(item.file.name);
+    const isInstalled = isModInstalled(item);
 
-    // Extract a readable name from the filename since Gaijin's feed doesn't include a title property
-    const cleanModName = item.file.name
-      .replace(/\.(zip|rar|tar|gz)$/i, '')
-      .replace(/_/g, ' ')
-      .replace(/%20/g, ' ');
+    // Extract a readable post title from the description, falling back to the filename
+    const cleanModName = getPostTitle(item);
 
     // Strip HTML from description to get a clean snippet
     const rawDescText = stripHtml(item.description || '');
@@ -409,7 +546,7 @@ function renderCards(list) {
     
     card.innerHTML = `
       <div class="card-media" data-images='${JSON.stringify(imagesList)}' data-index="0">
-        <img class="card-img" src="${imageUrl}" alt="${item.file.name}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=Error+Loading'" onclick="openFullscreenImage(this.src, event)">
+        <img class="card-img" src="${imageUrl}" alt="${item.file.name}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=Error+Loading'" onclick="openFullscreenImage(this.src, JSON.parse(this.parentNode.getAttribute('data-images')), parseInt(this.parentNode.getAttribute('data-index'), 10), event)">
         
         ${hasMultipleImages ? `
           <button class="gallery-btn prev" onclick="changeCardImage(this, -1, event)">‹</button>
@@ -428,7 +565,12 @@ function renderCards(list) {
             <span>${item.author.nickname}</span>
           </div>
           <h2 class="card-title" title="${cleanModName}">${cleanModName}</h2>
-          <p class="card-desc" style="font-size: 12px; color: var(--text-muted); line-height: 1.4; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-overflow: ellipsis; margin-top: 4px;" title="${rawDescText}">${descSnippet}</p>
+          <div class="card-desc-wrapper">
+            <div class="card-desc collapsed" id="desc-${item.id}">
+              ${item.description}
+            </div>
+            ${rawDescText.length > 110 ? `<button class="btn-read-more" onclick="toggleDescription('desc-${item.id}', this)">Read More</button>` : ''}
+          </div>
         </div>
         <div class="card-stats">
           <span>👍 ${likes}</span>
@@ -442,7 +584,7 @@ function renderCards(list) {
           <span class="file-size">${sizeMb} MB</span>
         </div>
         <button class="btn-install ${isInstalled ? 'installed' : ''}" 
-                onclick="installMod('${item.file.link}', '${item.type}', '${item.file.name}', ${item.lang_group}, this)"
+                onclick="installMod('${item.file.link}', '${item.type}', '${item.file.name}', ${item.lang_group}, ${item.id}, this)"
                 ${isInstalled ? 'disabled' : ''}>
           ${isInstalled ? '✓ Installed' : '📥 Install'}
         </button>
@@ -472,27 +614,124 @@ window.changeCardImage = function(btn, dir, event) {
   });
 };
 
+// Toggle Card description expansion
+window.toggleDescription = function(descId, btn) {
+  const descEl = document.getElementById(descId);
+  if (descEl.classList.contains('collapsed')) {
+    descEl.classList.remove('collapsed');
+    descEl.classList.add('expanded');
+    btn.innerText = 'Read Less';
+  } else {
+    descEl.classList.add('collapsed');
+    descEl.classList.remove('expanded');
+    btn.innerText = 'Read More';
+  }
+};
+
 // Fullscreen Image Lightbox Functions
-window.openFullscreenImage = function(src, event) {
+window.openFullscreenImage = function(src, imagesList, currentIndex, event) {
   if (event) event.stopPropagation();
-  elements.lightboxImg.src = src;
+  
+  state.lightbox = {
+    images: imagesList || [src],
+    index: currentIndex || 0,
+    scale: 1,
+    translateX: 0,
+    translateY: 0,
+    isDragging: false,
+    startX: 0,
+    startY: 0
+  };
+  
+  updateLightboxUI();
   elements.lightboxOverlay.classList.remove('hidden');
 };
 
 window.closeLightbox = function() {
   elements.lightboxOverlay.classList.add('hidden');
+  if (state.lightbox) {
+    state.lightbox = null;
+  }
 };
 
-function isModInstalled(filename) {
+window.changeLightboxImage = function(dir, event) {
+  if (event) event.stopPropagation();
+  if (!state.lightbox || state.lightbox.images.length <= 1) return;
+  
+  state.lightbox.index = (state.lightbox.index + dir + state.lightbox.images.length) % state.lightbox.images.length;
+  state.lightbox.scale = 1;
+  state.lightbox.translateX = 0;
+  state.lightbox.translateY = 0;
+  
+  updateLightboxUI();
+};
+
+window.zoomLightbox = function(amount, event) {
+  if (event) event.stopPropagation();
+  if (!state.lightbox) return;
+  
+  state.lightbox.scale = Math.max(0.5, Math.min(4, state.lightbox.scale + amount));
+  updateLightboxTransform();
+};
+
+window.resetLightboxZoom = function(event) {
+  if (event) event.stopPropagation();
+  if (!state.lightbox) return;
+  
+  state.lightbox.scale = 1;
+  state.lightbox.translateX = 0;
+  state.lightbox.translateY = 0;
+  updateLightboxTransform();
+};
+
+function updateLightboxUI() {
+  const imgUrl = state.lightbox.images[state.lightbox.index];
+  elements.lightboxImg.src = imgUrl;
+  
+  // Show/hide navigation arrows based on count of images
+  const prevBtn = document.getElementById('lightbox-prev');
+  const nextBtn = document.getElementById('lightbox-next');
+  if (state.lightbox.images.length > 1) {
+    prevBtn.style.display = 'flex';
+    nextBtn.style.display = 'flex';
+  } else {
+    prevBtn.style.display = 'none';
+    nextBtn.style.display = 'none';
+  }
+  
+  updateLightboxTransform();
+}
+
+function updateLightboxTransform() {
+  elements.lightboxImg.style.transform = `scale(${state.lightbox.scale}) translate(${state.lightbox.translateX}px, ${state.lightbox.translateY}px)`;
+  document.getElementById('lightbox-zoom-val').innerText = `${Math.round(state.lightbox.scale * 100)}%`;
+  
+  // Toggle cursor style based on zoom
+  if (state.lightbox.scale > 1) {
+    elements.lightboxImg.style.cursor = 'grab';
+  } else {
+    elements.lightboxImg.style.cursor = 'default';
+  }
+}
+
+function isModInstalled(item) {
+  if (!item || !item.file) return false;
+  const filename = item.file.name;
   const cleanName = filename.replace(/\.(zip|rar|tar|gz)$/i, '').replace(/[^a-zA-Z0-9_\-\.]/g, '_').toLowerCase();
   
   if (state.contentType === 'camouflage') {
     return state.installedList.skins.some(x => {
+      if (x.metadata && x.metadata.postId === item.id) {
+        return true;
+      }
       const name = x.name.replace(/\.[^/.]+$/, "").toLowerCase(); // strip extension
       return name === cleanName || name.includes(cleanName) || cleanName.includes(name);
     });
   } else {
     return state.installedList.sights.some(x => {
+      if (x.metadata && x.metadata.postId === item.id) {
+        return true;
+      }
       const name = x.name.replace(/\.[^/.]+$/, "").toLowerCase(); // strip extension
       return name === cleanName || name.includes(cleanName) || cleanName.includes(name);
     });
@@ -500,7 +739,7 @@ function isModInstalled(filename) {
 }
 
 // API: Install Modification
-async function installMod(url, type, name, lang_group, btnElement) {
+async function installMod(url, type, name, lang_group, postId, btnElement) {
   if (type === 'camouflage' && !state.wtPathValid) {
     showToast('Please set and save a valid War Thunder Game Folder first!', 'warning');
     return;
@@ -518,7 +757,7 @@ async function installMod(url, type, name, lang_group, btnElement) {
     const res = await fetch('/api/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, type, name, lang_group })
+      body: JSON.stringify({ url, type, name, lang_group, postId })
     });
     
     const data = await res.json();
@@ -639,6 +878,56 @@ async function deleteMod(type, name) {
   }
 }
 
+// Helper to clean telemetry vehicle names to standard WT Live vehicle IDs
+function cleanTelemetryVehicleName(rawName) {
+  if (!rawName) return '';
+  // 1. Remove #tankmodels/, #airmodels/, #navalmodels/ prefixes
+  let cleaned = rawName.replace(/^#?[a-zA-Z0-9_\-]+\//, '');
+  
+  // 2. Fix German missing underscore (e.g. germm44 -> germ_m44)
+  if (cleaned.startsWith('germ') && !cleaned.startsWith('germ_')) {
+    cleaned = 'germ_' + cleaned.substring(4);
+  }
+  // usm1a2 -> us_m1a2
+  if (cleaned.startsWith('us') && !cleaned.startsWith('us_') && !cleaned.startsWith('ussr')) {
+    cleaned = 'us_' + cleaned.substring(2);
+  }
+  // ussrt34 -> ussr_t34
+  if (cleaned.startsWith('ussr') && !cleaned.startsWith('ussr_')) {
+    cleaned = 'ussr_' + cleaned.substring(4);
+  }
+  // ukspitfire -> uk_spitfire
+  if (cleaned.startsWith('uk') && !cleaned.startsWith('uk_')) {
+    cleaned = 'uk_' + cleaned.substring(2);
+  }
+  // jptype90 -> jp_type90
+  if (cleaned.startsWith('jp') && !cleaned.startsWith('jp_')) {
+    cleaned = 'jp_' + cleaned.substring(2);
+  }
+  // itcentauro -> it_centauro
+  if (cleaned.startsWith('it') && !cleaned.startsWith('it_')) {
+    cleaned = 'it_' + cleaned.substring(2);
+  }
+  // frleclerc -> fr_leclerc
+  if (cleaned.startsWith('fr') && !cleaned.startsWith('fr_')) {
+    cleaned = 'fr_' + cleaned.substring(2);
+  }
+  // cnztz99 -> cn_ztz99
+  if (cleaned.startsWith('cn') && !cleaned.startsWith('cn_')) {
+    cleaned = 'cn_' + cleaned.substring(2);
+  }
+  // swestrv122 -> swe_strv122
+  if (cleaned.startsWith('swe') && !cleaned.startsWith('swe_')) {
+    cleaned = 'swe_' + cleaned.substring(3);
+  }
+  // ilmerkava -> il_merkava
+  if (cleaned.startsWith('il') && !cleaned.startsWith('il_')) {
+    cleaned = 'il_' + cleaned.substring(2);
+  }
+  
+  return cleaned;
+}
+
 // API: Poll game telemetry
 async function pollTelemetry() {
   try {
@@ -646,12 +935,13 @@ async function pollTelemetry() {
     const data = await res.json();
     
     if (data.active) {
+      const cleanedVehicle = cleanTelemetryVehicleName(data.vehicle);
       state.telemetryActive = true;
-      state.activeVehicle = data.vehicle;
+      state.activeVehicle = cleanedVehicle;
       
       elements.telemetryPulse.className = 'pulse-indicator active';
       elements.telemetryStatus.innerText = 'WT Client Active';
-      elements.activeVehicleName.innerText = formatVehicleDisplayName(data.vehicle);
+      elements.activeVehicleName.innerText = formatVehicleDisplayName(cleanedVehicle);
       elements.telemetryContent.classList.remove('hidden');
       document.getElementById('telemetry-footer-text').innerText = 'In-match tracking active';
     } else {
@@ -711,7 +1001,12 @@ function showToast(message, type = 'info') {
 // Helpers for searching and filtering
 function getQueryStringForAPI() {
   if (state.searchString) {
-    return state.searchString;
+    let q = state.searchString.trim();
+    // Prepend # and strip spaces/hyphens/underscores if search string doesn't start with #
+    if (q && !q.startsWith('#')) {
+      q = '#' + q.replace(/[\s\-_]+/g, '');
+    }
+    return q;
   }
   
   if (state.contentType === 'camouflage') {
@@ -731,9 +1026,11 @@ function updateFilterVisibility() {
   if (state.contentType === 'camouflage') {
     elements.countryFilterGroup.classList.remove('hidden');
     elements.vehicleTypeFilterGroup.classList.remove('hidden');
+    elements.universalFilterGroup.classList.remove('hidden');
   } else {
     elements.countryFilterGroup.classList.add('hidden');
     elements.vehicleTypeFilterGroup.classList.add('hidden');
+    elements.universalFilterGroup.classList.add('hidden');
   }
 }
 

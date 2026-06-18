@@ -131,6 +131,11 @@
                 <option value="created">Recent</option>
               </select>
             </div>
+
+            <div class="control-group" id="universal-filter-group" style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="hide-universal-checkbox" style="width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--accent-primary);">
+              <label for="hide-universal-checkbox" style="margin: 0; cursor: pointer; user-select: none; font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Hide Universal</label>
+            </div>
           </div>
         </div>
 
@@ -191,8 +196,24 @@
 
   <!-- Fullscreen Image Lightbox -->
   <div class="overlay hidden" id="lightbox-overlay" onclick="closeLightbox()">
-    <span class="close-btn">&times;</span>
-    <img id="lightbox-img" src="" alt="Fullscreen Preview" onclick="event.stopPropagation()">
+    <span class="close-btn" onclick="closeLightbox()">&times;</span>
+    
+    <!-- Navigation Buttons -->
+    <button class="lightbox-btn prev" id="lightbox-prev" onclick="changeLightboxImage(-1, event)">‹</button>
+    
+    <div class="lightbox-container" onclick="event.stopPropagation()">
+      <img id="lightbox-img" src="" alt="Fullscreen Preview" style="transform: scale(1) translate(0, 0); cursor: default; transition: transform 0.1s ease-out;">
+    </div>
+    
+    <button class="lightbox-btn next" id="lightbox-next" onclick="changeLightboxImage(1, event)">›</button>
+    
+    <!-- Controls (Zoom Indicator / Actions) -->
+    <div class="lightbox-controls" onclick="event.stopPropagation()">
+      <button class="control-icon-btn" onclick="zoomLightbox(0.2, event)">➕ Zoom In</button>
+      <span class="zoom-value" id="lightbox-zoom-val">100%</span>
+      <button class="control-icon-btn" onclick="zoomLightbox(-0.2, event)">➖ Zoom Out</button>
+      <button class="control-icon-btn" onclick="resetLightboxZoom(event)">🔄 Reset</button>
+    </div>
   </div>
 
   <script src="index.js"></script>
