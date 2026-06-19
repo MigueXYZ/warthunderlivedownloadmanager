@@ -19,6 +19,7 @@ No more manual downloading, extracting, renaming, and copying zip files!
 
 ## 🚀 How to Run the App
 
+### Standard Run (Visible terminal)
 1.  Open your terminal inside this project directory.
 2.  Start the local server by running:
     ```bash
@@ -27,6 +28,12 @@ No more manual downloading, extracting, renaming, and copying zip files!
     *(If script execution policies block npm on Windows, run `npm.cmd start` or `node server.js` instead).*
 3.  Open your browser and navigate to:
     **[http://localhost:3000](http://localhost:3000)**
+
+### Background Run (Windows)
+If you prefer to run the application invisibly in the background without keeping a command prompt window open:
+1.  Double-click [start_background.bat](file:///E:/DEV/Projects/warthunderlivedownloadmanager/start_background.bat) in the project root.
+2.  Open your browser and navigate to: **[http://localhost:3000](http://localhost:3000)**
+3.  To stop the application, double-click [stop_background.bat](file:///E:/DEV/Projects/warthunderlivedownloadmanager/stop_background.bat) to terminate the process.
 
 ---
 
