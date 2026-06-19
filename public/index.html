@@ -159,6 +159,11 @@
           <button class="btn-secondary" onclick="loadLibrary()">🔄 Refresh Library</button>
         </div>
 
+        <!-- Library Search Bar -->
+        <div class="search-bar-wrapper" style="margin-bottom: 24px;">
+          <input type="text" id="library-search-input" placeholder="🔍 Search installed skins or sights by name or author..." oninput="filterLibrary()">
+        </div>
+
         <div class="library-columns">
           <!-- Skins Column -->
           <div class="library-col">

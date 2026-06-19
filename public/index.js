@@ -13,7 +13,8 @@ const state = {
   sightsPathValid: false,
   telemetryActive: false,
   activeVehicle: '',
-  hideUniversal: false // Hide universal skins if searching a specific vehicle
+  hideUniversal: false, // Hide universal skins if searching a specific vehicle
+  currentFeedList: []
 };
 
 // DOM Elements
@@ -51,6 +52,7 @@ const elements = {
   countSights: document.getElementById('count-sights'),
   skinsList: document.getElementById('skins-list'),
   sightsList: document.getElementById('sights-list'),
+  librarySearchInput: document.getElementById('library-search-input'),
   
   telemetryPanel: document.getElementById('telemetry-panel'),
   telemetryPulse: document.getElementById('telemetry-pulse'),
@@ -408,6 +410,7 @@ async function fetchFeed() {
         return true;
       });
       
+      state.currentFeedList = data.data.list || [];
       renderCards(filteredList);
       
       // Update pagination
@@ -584,7 +587,7 @@ function renderCards(list) {
           <span class="file-size">${sizeMb} MB</span>
         </div>
         <button class="btn-install ${isInstalled ? 'installed' : ''}" 
-                onclick="installMod('${item.file.link}', '${item.type}', '${item.file.name}', ${item.lang_group}, ${item.id}, this)"
+                onclick="installModById(${item.id}, this)"
                 ${isInstalled ? 'disabled' : ''}>
           ${isInstalled ? '✓ Installed' : '📥 Install'}
         </button>
@@ -738,8 +741,15 @@ function isModInstalled(item) {
   }
 }
 
-// API: Install Modification
-async function installMod(url, type, name, lang_group, postId, btnElement) {
+// API: Install Modification using Cached Item ID (and pass metadata details)
+async function installModById(id, btnElement) {
+  const item = state.currentFeedList.find(x => x.id === id);
+  if (!item) {
+    showToast('Failed to find mod data in cache.', 'error');
+    return;
+  }
+  
+  const type = item.type || state.contentType;
   if (type === 'camouflage' && !state.wtPathValid) {
     showToast('Please set and save a valid War Thunder Game Folder first!', 'warning');
     return;
@@ -753,11 +763,19 @@ async function installMod(url, type, name, lang_group, postId, btnElement) {
   elements.overlayTitle.innerText = `Installing ${type === 'camouflage' ? 'Skin' : 'Sight'}...`;
   elements.installOverlay.classList.remove('hidden');
   
+  const url = item.file.link;
+  const name = item.file.name;
+  const lang_group = item.lang_group;
+  const postId = item.id;
+  const title = getPostTitle(item);
+  const image = (item.images && item.images.length > 0) ? item.images[0].src : '';
+  const author = item.author ? { nickname: item.author.nickname, avatar: item.author.avatar } : null;
+  
   try {
     const res = await fetch('/api/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, type, name, lang_group, postId })
+      body: JSON.stringify({ url, type, name, lang_group, postId, title, image, author })
     });
     
     const data = await res.json();
@@ -802,51 +820,165 @@ async function loadLibrary() {
   }
 }
 
-// Render Library Tab Lists
+// API: Toggle Mod Active State
+async function toggleModActive(type, name) {
+  try {
+    const res = await fetch('/api/installed/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, name })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message, 'success');
+      loadLibrary();
+      
+      if (state.activeTab === 'browse') {
+        fetchFeed();
+      }
+    } else {
+      showToast(data.error || 'Failed to toggle modification state.', 'error');
+    }
+  } catch (e) {
+    showToast('Connection error during toggle.', 'error');
+  }
+}
+
+// Render Library Tab Lists using Steam Library Style Visual Cards
 function renderLibraryLists() {
   // Skins List
   elements.skinsList.innerHTML = '';
   if (state.installedList.skins.length === 0) {
-    elements.skinsList.innerHTML = '<div class="info-text" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px;">No custom skins installed.</div>';
+    elements.skinsList.innerHTML = '<div class="info-text" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; width: 100%;">No custom skins installed.</div>';
   } else {
     state.installedList.skins.forEach(skin => {
-      const item = document.createElement('div');
-      item.className = 'lib-item';
+      const metadata = skin.metadata || {};
+      const displayTitle = metadata.title || cleanFilename(metadata.fileName || skin.name);
+      const imageUrl = metadata.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
+      
+      let authorHtml = '';
+      if (metadata.author && metadata.author.nickname) {
+        const avatar = metadata.author.avatar || 'https://placehold.co/150x150/111317/fff?text=U';
+        authorHtml = `
+          <div class="lib-item-author">
+            <img src="${avatar}" alt="${metadata.author.nickname}" onerror="this.style.display='none'">
+            <span>${metadata.author.nickname}</span>
+          </div>
+        `;
+      }
       
       const dateStr = new Date(skin.installedAt).toLocaleDateString();
+      const typeSpecificMeta = skin.hasBlk ? '📄 BLK OK' : '⚠️ No BLK';
       
-      item.innerHTML = `
-        <div class="lib-item-info">
-          <span class="lib-item-name" title="${skin.name}">${skin.name}</span>
-          <span class="lib-item-date">Installed: ${dateStr} ${skin.hasBlk ? '' : '(No .blk detected)'}</span>
+      const card = document.createElement('div');
+      card.className = `lib-card ${skin.disabled ? 'disabled' : ''}`;
+      card.innerHTML = `
+        <div class="lib-card-media" onclick="openFullscreenImage(this.querySelector('img').src, [this.querySelector('img').src], 0, event)">
+          <img src="${imageUrl}" alt="${displayTitle}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=No+Preview'">
+          ${skin.disabled ? '<span class="disabled-badge">Disabled</span>' : ''}
         </div>
-        <button class="btn-delete" onclick="deleteMod('camouflage', '${skin.name}')">Delete</button>
+        <div class="lib-card-content">
+          <div class="lib-card-title" title="${displayTitle}">${displayTitle}</div>
+          <div class="lib-card-meta">
+            ${authorHtml}
+            <span>📅 ${dateStr}</span>
+            <span>${typeSpecificMeta}</span>
+          </div>
+          <div class="lib-card-actions">
+            <button class="btn-toggle ${skin.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('camouflage', '${skin.name}')">
+              ${skin.disabled ? '🟢 Enable' : '🔴 Disable'}
+            </button>
+            <button class="btn-delete" onclick="deleteMod('camouflage', '${skin.name}')">🗑️ Delete</button>
+          </div>
+        </div>
       `;
-      elements.skinsList.appendChild(item);
+      elements.skinsList.appendChild(card);
     });
   }
   
   // Sights List
   elements.sightsList.innerHTML = '';
   if (state.installedList.sights.length === 0) {
-    elements.sightsList.innerHTML = '<div class="info-text" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px;">No custom sights installed.</div>';
+    elements.sightsList.innerHTML = '<div class="info-text" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; width: 100%;">No custom sights installed.</div>';
   } else {
     state.installedList.sights.forEach(sight => {
-      const item = document.createElement('div');
-      item.className = 'lib-item';
+      const metadata = sight.metadata || {};
+      const displayTitle = metadata.title || cleanFilename(metadata.fileName || sight.name);
+      const imageUrl = metadata.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
+      
+      let authorHtml = '';
+      if (metadata.author && metadata.author.nickname) {
+        const avatar = metadata.author.avatar || 'https://placehold.co/150x150/111317/fff?text=U';
+        authorHtml = `
+          <div class="lib-item-author">
+            <img src="${avatar}" alt="${metadata.author.nickname}" onerror="this.style.display='none'">
+            <span>${metadata.author.nickname}</span>
+          </div>
+        `;
+      }
       
       const dateStr = new Date(sight.installedAt).toLocaleDateString();
+      const typeSpecificMeta = `🎯 Files: ${sight.filesCount}`;
       
-      item.innerHTML = `
-        <div class="lib-item-info">
-          <span class="lib-item-name" title="${sight.name}">${sight.name}</span>
-          <span class="lib-item-date">Installed: ${dateStr} ${sight.isFile ? '(File)' : '(Folder)'}</span>
+      const card = document.createElement('div');
+      card.className = `lib-card ${sight.disabled ? 'disabled' : ''}`;
+      card.innerHTML = `
+        <div class="lib-card-media" onclick="openFullscreenImage(this.querySelector('img').src, [this.querySelector('img').src], 0, event)">
+          <img src="${imageUrl}" alt="${displayTitle}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=No+Preview'">
+          ${sight.disabled ? '<span class="disabled-badge">Disabled</span>' : ''}
         </div>
-        <button class="btn-delete" onclick="deleteMod('sight', '${sight.name}')">Delete</button>
+        <div class="lib-card-content">
+          <div class="lib-card-title" title="${displayTitle}">${displayTitle}</div>
+          <div class="lib-card-meta">
+            ${authorHtml}
+            <span>📅 ${dateStr}</span>
+            <span>${typeSpecificMeta}</span>
+          </div>
+          <div class="lib-card-actions">
+            <button class="btn-toggle ${sight.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('sight', '${sight.name}')">
+              ${sight.disabled ? '🟢 Enable' : '🔴 Disable'}
+            </button>
+            <button class="btn-delete" onclick="deleteMod('sight', '${sight.name}')">🗑️ Delete</button>
+          </div>
+        </div>
       `;
-      elements.sightsList.appendChild(item);
+      elements.sightsList.appendChild(card);
     });
   }
+
+  // Apply library filter if query exists
+  filterLibrary();
+}
+
+// Filter Local Library Items
+function filterLibrary() {
+  const inputEl = document.getElementById('library-search-input');
+  if (!inputEl) return;
+  const query = inputEl.value.toLowerCase().trim();
+  
+  // Filter skins
+  const skinCards = elements.skinsList.querySelectorAll('.lib-card');
+  skinCards.forEach(card => {
+    const title = card.querySelector('.lib-card-title').textContent.toLowerCase();
+    const meta = card.querySelector('.lib-card-meta').textContent.toLowerCase();
+    if (title.includes(query) || meta.includes(query)) {
+      card.style.display = 'flex';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  
+  // Filter sights
+  const sightCards = elements.sightsList.querySelectorAll('.lib-card');
+  sightCards.forEach(card => {
+    const title = card.querySelector('.lib-card-title').textContent.toLowerCase();
+    const meta = card.querySelector('.lib-card-meta').textContent.toLowerCase();
+    if (title.includes(query) || meta.includes(query)) {
+      card.style.display = 'flex';
+    } else {
+      card.style.display = 'none';
+    }
+  });
 }
 
 // API: Delete Installed Mod

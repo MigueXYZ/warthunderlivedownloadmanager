@@ -239,7 +239,7 @@ async function downloadFile(url, destPath, cookie) {
 
 // API: Trigger download and installation of a skin/sight
 app.post('/api/download', async (req, res) => {
-  const { url, type, name, lang_group, postId } = req.body;
+  const { url, type, name, lang_group, postId, title, image, author } = req.body;
   const settings = loadSettings();
 
   if (type === 'camouflage' && (!settings.wtPath || !fs.existsSync(settings.wtPath))) {
@@ -345,6 +345,9 @@ app.post('/api/download', async (req, res) => {
             lang_group: lang_group ? parseInt(lang_group, 10) : null,
             fileName: name,
             type,
+            title: title || null,
+            image: image || null,
+            author: author || null,
             installedAt: Date.now()
           };
           fs.writeFileSync(
@@ -451,6 +454,9 @@ app.post('/api/download', async (req, res) => {
           lang_group: lang_group ? parseInt(lang_group, 10) : null,
           fileName: name,
           type,
+          title: title || null,
+          image: image || null,
+          author: author || null,
           installedAt: Date.now()
         };
         fs.writeFileSync(
@@ -479,53 +485,25 @@ app.post('/api/download', async (req, res) => {
   }
 });
 
-// API: List installed skins and sights
+// API: List installed skins and sights (including disabled mods in separate folders)
 app.get('/api/installed', (req, res) => {
   const settings = loadSettings();
   const installedSkins = [];
   const installedSights = [];
 
-  // Read UserSkins
+  // Read UserSkins (active and disabled)
   if (settings.wtPath && fs.existsSync(settings.wtPath)) {
     const skinsDir = path.join(settings.wtPath, 'UserSkins');
-    if (fs.existsSync(skinsDir)) {
-      const files = fs.readdirSync(skinsDir);
-      for (const file of files) {
-        const fullPath = path.join(skinsDir, file);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          let metadata = null;
-          const metaPath = path.join(fullPath, '.wtlive.json');
-          if (fs.existsSync(metaPath)) {
-            try {
-              metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-            } catch (_) {}
-          }
-          installedSkins.push({
-            name: file,
-            path: fullPath,
-            installedAt: stat.mtime,
-            hasBlk,
-            metadata
-          });
-        }
-      }
-    }
-  }
+    const disabledSkinsDir = path.join(settings.wtPath, 'UserSkins_disabled');
 
-  // Read UserSights
-  if (settings.sightsPath && fs.existsSync(settings.sightsPath)) {
-    const sightsDir = settings.sightsPath;
-    if (fs.existsSync(sightsDir)) {
-      const files = fs.readdirSync(sightsDir);
+    const scanSkins = (dir, isDisabled) => {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir);
       for (const file of files) {
-        const fullPath = path.join(sightsDir, file);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          // Check if it has a subfolder 'all_tanks'
-          const allTanksDir = path.join(fullPath, 'all_tanks');
-          if (fs.existsSync(allTanksDir) && fs.statSync(allTanksDir).isDirectory()) {
-            const subfiles = fs.readdirSync(allTanksDir);
+        const fullPath = path.join(dir, file);
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.isDirectory()) {
             let metadata = null;
             const metaPath = path.join(fullPath, '.wtlive.json');
             if (fs.existsSync(metaPath)) {
@@ -533,25 +511,129 @@ app.get('/api/installed', (req, res) => {
                 metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
               } catch (_) {}
             }
-            if (blkFiles.length > 0) {
+            let hasBlk = false;
+            try {
+              hasBlk = fs.readdirSync(fullPath).some(f => f.toLowerCase().endsWith('.blk'));
+            } catch (_) {}
+
+            installedSkins.push({
+              name: file,
+              disabled: isDisabled,
+              path: fullPath,
+              installedAt: stat.mtimeMs || stat.mtime.getTime(),
+              hasBlk,
+              metadata
+            });
+          }
+        } catch (_) {}
+      }
+    };
+
+    scanSkins(skinsDir, false);
+    scanSkins(disabledSkinsDir, true);
+  }
+
+  // Read UserSights (active and disabled)
+  if (settings.sightsPath && fs.existsSync(settings.sightsPath)) {
+    const sightsDir = settings.sightsPath;
+    const disabledSightsDir = settings.sightsPath + '_disabled';
+
+    const scanSights = (dir, isDisabled) => {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.isDirectory()) {
+            // Check if it has a subfolder 'all_tanks'
+            const allTanksDir = path.join(fullPath, 'all_tanks');
+            if (fs.existsSync(allTanksDir) && fs.statSync(allTanksDir).isDirectory()) {
+              const subfiles = fs.readdirSync(allTanksDir);
+              const blkFiles = subfiles.filter(f => f.toLowerCase().endsWith('.blk'));
+              let metadata = null;
+              const metaPath = path.join(fullPath, '.wtlive.json');
+              if (fs.existsSync(metaPath)) {
+                try {
+                  metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+                } catch (_) {}
+              }
+
               installedSights.push({
-                name: file, // Name of the mod folder
+                name: file,
+                disabled: isDisabled,
                 path: fullPath,
-                installedAt: stat.mtime,
+                installedAt: stat.mtimeMs || stat.mtime.getTime(),
                 filesCount: blkFiles.length,
                 metadata
               });
             }
           }
-        }
+        } catch (_) {}
       }
-    }
+    };
+
+    scanSights(sightsDir, false);
+    scanSights(disabledSightsDir, true);
   }
 
   res.json({
     skins: installedSkins.sort((a, b) => b.installedAt - a.installedAt),
     sights: installedSights.sort((a, b) => b.installedAt - a.installedAt)
   });
+});
+
+// API: Toggle modification active/disabled state by moving folder
+app.post('/api/installed/toggle', (req, res) => {
+  const { type, name } = req.body;
+  const settings = loadSettings();
+
+  if (!name || !type) {
+    return res.status(400).json({ error: 'Missing parameters: type, name' });
+  }
+
+  let activeBaseDir = '';
+  let disabledBaseDir = '';
+  if (type === 'camouflage') {
+    if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
+    activeBaseDir = path.join(settings.wtPath, 'UserSkins');
+    disabledBaseDir = path.join(settings.wtPath, 'UserSkins_disabled');
+  } else if (type === 'sight') {
+    if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
+    activeBaseDir = settings.sightsPath;
+    disabledBaseDir = settings.sightsPath + '_disabled';
+  } else {
+    return res.status(400).json({ error: 'Invalid type' });
+  }
+
+  const activePath = path.join(activeBaseDir, name);
+  const disabledPath = path.join(disabledBaseDir, name);
+
+  const activeExists = fs.existsSync(activePath);
+  const disabledExists = fs.existsSync(disabledPath);
+
+  try {
+    if (activeExists && !disabledExists) {
+      if (!fs.existsSync(disabledBaseDir)) {
+        fs.mkdirSync(disabledBaseDir, { recursive: true });
+      }
+      fs.renameSync(activePath, disabledPath);
+      return res.json({ success: true, disabled: true, message: `${name} disabled successfully.` });
+    } else if (disabledExists && !activeExists) {
+      if (!fs.existsSync(activeBaseDir)) {
+        fs.mkdirSync(activeBaseDir, { recursive: true });
+      }
+      fs.renameSync(disabledPath, activePath);
+      return res.json({ success: true, disabled: false, message: `${name} enabled successfully.` });
+    } else if (activeExists && disabledExists) {
+      return res.status(409).json({ error: `Conflict: both active and disabled folders exist for ${name}` });
+    } else {
+      return res.status(404).json({ error: `Modification folder not found for ${name}` });
+    }
+  } catch (err) {
+    console.error('Error toggling modification state:', err);
+    return res.status(500).json({ error: `Toggle failed: ${err.message}` });
+  }
 });
 
 // API: Delete an installed skin/sight
@@ -564,26 +646,34 @@ app.delete('/api/installed', (req, res) => {
   }
 
   let folderPath = '';
+  let disabledFolderPath = '';
   if (type === 'camouflage') {
     if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
     folderPath = path.join(settings.wtPath, 'UserSkins', name);
+    disabledFolderPath = path.join(settings.wtPath, 'UserSkins_disabled', name);
   } else if (type === 'sight') {
     if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
     folderPath = path.join(settings.sightsPath, name);
+    disabledFolderPath = path.join(settings.sightsPath + '_disabled', name);
   } else {
     return res.status(400).json({ error: 'Invalid type' });
   }
 
-  if (!fs.existsSync(folderPath)) {
+  let pathToTarget = '';
+  if (fs.existsSync(folderPath)) {
+    pathToTarget = folderPath;
+  } else if (fs.existsSync(disabledFolderPath)) {
+    pathToTarget = disabledFolderPath;
+  } else {
     return res.status(404).json({ error: 'Folder or file not found' });
   }
 
   try {
-    const stat = fs.statSync(folderPath);
+    const stat = fs.statSync(pathToTarget);
     if (stat.isDirectory()) {
-      fs.rmSync(folderPath, { recursive: true, force: true });
+      fs.rmSync(pathToTarget, { recursive: true, force: true });
     } else {
-      fs.unlinkSync(folderPath);
+      fs.unlinkSync(pathToTarget);
     }
     res.json({ success: true, message: `${name} deleted successfully.` });
   } catch (err) {

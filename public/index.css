@@ -396,10 +396,15 @@ button {
   flex-grow: 1;
   padding: 32px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .tab-content.active {
   display: flex;
+}
+
+#tab-library.tab-content {
+  overflow: hidden;
 }
 
 /* Filter panel on Browse Tab */
@@ -713,9 +718,10 @@ select:focus {
 .library-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
   gap: 32px;
   flex-grow: 1;
-  min-height: 0; /* allows columns to scroll */
+  min-height: 0;
 }
 
 .library-col {
@@ -727,6 +733,7 @@ select:focus {
   border-radius: var(--radius-lg);
   padding: 24px;
   overflow: hidden;
+  min-height: 0;
 }
 
 .library-col h3 {
@@ -1180,3 +1187,163 @@ select:focus {
   from { transform: scale(0.92); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* Visual Library Cards */
+.list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-grow: 1;
+  overflow-y: auto;
+  padding-right: 8px;
+  max-height: calc(100vh - 280px);
+}
+
+.lib-card {
+  display: flex;
+  height: 110px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all var(--transition-normal);
+  flex-shrink: 0;
+}
+
+.lib-card:hover {
+  border-color: var(--accent-secondary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.lib-card.disabled {
+  opacity: 0.55;
+}
+
+.lib-card-media {
+  width: 140px;
+  height: 100%;
+  min-width: 140px;
+  position: relative;
+  cursor: zoom-in;
+  overflow: hidden;
+  background-color: var(--bg-input);
+}
+
+.lib-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.disabled-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: var(--color-error);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.lib-card-content {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  flex-grow: 1;
+  min-width: 0; /* allows text truncation */
+  height: 100%;
+}
+
+.lib-card-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.lib-card.disabled .lib-card-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.lib-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 16px;
+  height: 16px;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.lib-item-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lib-item-author img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.lib-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto; /* Pushes the actions to the bottom! */
+  flex-shrink: 0;
+}
+
+.lib-card-actions button {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-toggle {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
+.btn-toggle.enable {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.btn-toggle.enable:hover {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.btn-toggle.disable {
+  border-color: var(--text-muted);
+  color: var(--text-muted);
+}
+
+.btn-toggle.disable:hover {
+  background: var(--border-color);
+  color: #fff;
+}
+
