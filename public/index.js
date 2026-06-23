@@ -10,6 +10,7 @@ const state = {
   page: 0,
   installedList: { skins: [], sights: [] },
   queueList: { active: null, queue: [], history: [] },
+  updatesList: [],
   wtPathValid: false,
   sightsPathValid: false,
   telemetryActive: false,
@@ -910,12 +911,39 @@ function renderLibraryLists() {
       const dateStr = new Date(skin.installedAt).toLocaleDateString();
       const typeSpecificMeta = skin.hasBlk ? '📄 BLK OK' : '⚠️ No BLK';
       
+      // Update check
+      const update = state.updatesList && state.updatesList.find(u => u.postId === metadata.postId && u.type === 'camouflage');
+      let updateBadgeHtml = '';
+      let updateBtnHtml = '';
+      
+      if (update) {
+        updateBadgeHtml = `<span class="update-badge">Update</span>`;
+        
+        let updateBtnText = '🔄 Update';
+        let updateBtnDisabled = '';
+        
+        if (state.queueList.active && state.queueList.active.postId === metadata.postId) {
+          updateBtnText = '⏳ Updating...';
+          updateBtnDisabled = 'disabled';
+        } else if (state.queueList.queue.some(q => q.postId === metadata.postId)) {
+          updateBtnText = '✓ Queued';
+          updateBtnDisabled = 'disabled';
+        }
+        
+        updateBtnHtml = `
+          <button class="btn-update" onclick="installUpdate(${JSON.stringify(update).replace(/"/g, '&quot;')}, this)" ${updateBtnDisabled}>
+            ${updateBtnText}
+          </button>
+        `;
+      }
+
       const card = document.createElement('div');
       card.className = `lib-card ${skin.disabled ? 'disabled' : ''}`;
       card.innerHTML = `
         <div class="lib-card-media" onclick="openFullscreenImage(this.querySelector('img').src, [this.querySelector('img').src], 0, event)">
           <img src="${imageUrl}" alt="${displayTitle}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=No+Preview'">
           ${skin.disabled ? '<span class="disabled-badge">Disabled</span>' : ''}
+          ${updateBadgeHtml}
         </div>
         <div class="lib-card-content">
           <div class="lib-card-title" title="${displayTitle}">${displayTitle}</div>
@@ -925,6 +953,7 @@ function renderLibraryLists() {
             <span>${typeSpecificMeta}</span>
           </div>
           <div class="lib-card-actions">
+            ${updateBtnHtml}
             <button class="btn-toggle ${skin.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('camouflage', '${skin.name}')">
               ${skin.disabled ? '🟢 Enable' : '🔴 Disable'}
             </button>
@@ -960,12 +989,39 @@ function renderLibraryLists() {
       const dateStr = new Date(sight.installedAt).toLocaleDateString();
       const typeSpecificMeta = `🎯 Files: ${sight.filesCount}`;
       
+      // Update check
+      const update = state.updatesList && state.updatesList.find(u => u.postId === metadata.postId && u.type === 'sight');
+      let updateBadgeHtml = '';
+      let updateBtnHtml = '';
+      
+      if (update) {
+        updateBadgeHtml = `<span class="update-badge">Update</span>`;
+        
+        let updateBtnText = '🔄 Update';
+        let updateBtnDisabled = '';
+        
+        if (state.queueList.active && state.queueList.active.postId === metadata.postId) {
+          updateBtnText = '⏳ Updating...';
+          updateBtnDisabled = 'disabled';
+        } else if (state.queueList.queue.some(q => q.postId === metadata.postId)) {
+          updateBtnText = '✓ Queued';
+          updateBtnDisabled = 'disabled';
+        }
+        
+        updateBtnHtml = `
+          <button class="btn-update" onclick="installUpdate(${JSON.stringify(update).replace(/"/g, '&quot;')}, this)" ${updateBtnDisabled}>
+            ${updateBtnText}
+          </button>
+        `;
+      }
+
       const card = document.createElement('div');
       card.className = `lib-card ${sight.disabled ? 'disabled' : ''}`;
       card.innerHTML = `
         <div class="lib-card-media" onclick="openFullscreenImage(this.querySelector('img').src, [this.querySelector('img').src], 0, event)">
           <img src="${imageUrl}" alt="${displayTitle}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=No+Preview'">
           ${sight.disabled ? '<span class="disabled-badge">Disabled</span>' : ''}
+          ${updateBadgeHtml}
         </div>
         <div class="lib-card-content">
           <div class="lib-card-title" title="${displayTitle}">${displayTitle}</div>
@@ -975,6 +1031,7 @@ function renderLibraryLists() {
             <span>${typeSpecificMeta}</span>
           </div>
           <div class="lib-card-actions">
+            ${updateBtnHtml}
             <button class="btn-toggle ${sight.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('sight', '${sight.name}')">
               ${sight.disabled ? '🟢 Enable' : '🔴 Disable'}
             </button>
@@ -1335,6 +1392,8 @@ window.cancelDownload = cancelDownload;
 window.clearQueueHistory = clearQueueHistory;
 window.addModToQueueById = addModToQueueById;
 window.pollQueue = pollQueue;
+window.checkUpdates = checkUpdates;
+window.installUpdate = installUpdate;
 
 // ==========================================
 // DOWNLOAD QUEUE HANDLERS & RENDERING
@@ -1623,4 +1682,83 @@ function updateResultsGridButtonStates() {
     btn.innerText = '📥 Install';
     btn.disabled = false;
   });
+}
+
+// Check updates for all installed mods on WT Live
+async function checkUpdates(btnElement) {
+  if (!btnElement) btnElement = document.getElementById('btn-check-updates');
+  
+  if (btnElement) {
+    btnElement.disabled = true;
+    btnElement.innerText = '⏳ Checking...';
+  }
+  
+  try {
+    showToast('Checking for updates on WT Live...', 'info');
+    const res = await fetch('/api/installed/check-updates');
+    const data = await res.json();
+    
+    state.updatesList = data.updates || [];
+    
+    if (state.updatesList.length > 0) {
+      showToast(`Found ${state.updatesList.length} updates!`, 'success');
+    } else {
+      showToast('All modifications are up to date.', 'success');
+    }
+    
+    // Rerender library lists to display badges and update buttons
+    renderLibraryLists();
+  } catch (e) {
+    showToast('Failed to check for updates.', 'error');
+  } finally {
+    if (btnElement) {
+      btnElement.disabled = false;
+      btnElement.innerText = '🔄 Check Updates';
+    }
+  }
+}
+
+// Queue an update download
+async function installUpdate(update, btnElement) {
+  if (btnElement) {
+    btnElement.disabled = true;
+    btnElement.innerText = '✓ Queued';
+  }
+
+  const { downloadUrl, type, name, newLangGroup, postId, title, image, author } = update;
+
+  try {
+    const res = await fetch('/api/queue/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: downloadUrl,
+        type,
+        name,
+        lang_group: newLangGroup,
+        postId,
+        title,
+        image,
+        author
+      })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Update for "${title || name}" added to queue!`, 'success');
+      pollQueue();
+    } else {
+      showToast(data.error || 'Failed to queue update.', 'error');
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.innerText = '🔄 Update';
+      }
+    }
+  } catch (e) {
+    showToast('Connection error starting update.', 'error');
+    if (btnElement) {
+      btnElement.disabled = false;
+      btnElement.innerText = '🔄 Update';
+    }
+  }
 }

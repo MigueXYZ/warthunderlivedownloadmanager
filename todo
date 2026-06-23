@@ -1,11 +1,4 @@
-                                                                                                         
-  ### 2. 🔄 Verificador de Atualizações (Update Checker)                                                          
-                                                                                                                
-  • Como funciona: Visto que o backend já cria um ficheiro de metadados server.js com o  postId  de cada     
-  modificação instalada, podemos criar uma rota que consulte a API do WT Live para cada  postId  local.           
-  • UI: Na aba My Library (index.html), caso o autor do mod tenha lançado uma nova versão (data de modificação
-  mais recente), seria exibido um botão "Update" para reinstalar a versão atualizada com um clique.               
-                                                                                                                  
+                                                                                                    
   ### 3. 🎨 Clonagem de Skins para Outras Variantes (Vehicle Variant Skin Cloner)                                 
                                                                                                               
   • Como funciona: Muitos criadores fazem skins excelentes para um tanque/avião específico (ex:  leopard_2a6 ),   

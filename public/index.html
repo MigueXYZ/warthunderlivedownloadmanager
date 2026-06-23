@@ -159,7 +159,10 @@
       <section class="tab-content" id="tab-library">
         <div class="library-header">
           <h2>Installed Modifications</h2>
-          <button class="btn-secondary" onclick="loadLibrary()">🔄 Refresh Library</button>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn-secondary" id="btn-check-updates" onclick="checkUpdates(this)">🔄 Check Updates</button>
+            <button class="btn-secondary" onclick="loadLibrary()">🔄 Refresh Library</button>
+          </div>
         </div>
 
         <!-- Library Search Bar -->

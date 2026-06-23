@@ -890,6 +890,98 @@ app.post('/api/queue/clear-history', (req, res) => {
   res.json({ success: true, message: 'Download history cleared.' });
 });
 
+// API: Check updates for installed modifications
+app.get('/api/installed/check-updates', async (req, res) => {
+  const settings = loadSettings();
+  const installedList = [];
+
+  const scanMods = (dir, type) => {
+    if (!fs.existsSync(dir)) return;
+    try {
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.isDirectory()) {
+            const metaPath = path.join(fullPath, '.wtlive.json');
+            if (fs.existsSync(metaPath)) {
+              try {
+                const metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+                if (metadata && metadata.postId && metadata.lang_group) {
+                  installedList.push({
+                    name: file,
+                    type,
+                    postId: metadata.postId,
+                    lang_group: metadata.lang_group,
+                    title: metadata.title || file,
+                    image: metadata.image || '',
+                    author: metadata.author || null
+                  });
+                }
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+  };
+
+  if (settings.wtPath) {
+    scanMods(path.join(settings.wtPath, 'UserSkins'), 'camouflage');
+    scanMods(path.join(settings.wtPath, 'UserSkins_disabled'), 'camouflage');
+  }
+  if (settings.sightsPath) {
+    scanMods(settings.sightsPath, 'sight');
+    scanMods(settings.sightsPath + '_disabled', 'sight');
+  }
+
+  const results = [];
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+  };
+  if (settings.cookie) {
+    headers['Cookie'] = `identity_sid=${settings.cookie}`;
+  }
+
+  for (const mod of installedList) {
+    try {
+      // 150ms delay between requests to be polite to Gaijin's servers
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      const response = await fetch(`https://live.warthunder.com/post/${mod.postId}/`, { headers });
+      if (!response.ok) {
+        continue;
+      }
+      
+      const html = await response.text();
+      const match = html.match(/lang_group=(\d+)/);
+      if (match) {
+        const onlineLangGroup = parseInt(match[1], 10);
+        if (onlineLangGroup !== mod.lang_group) {
+          const downloadUrl = `https://live.warthunder.com/api/post/download/?lang_group=${onlineLangGroup}`;
+          
+          results.push({
+            name: mod.name,
+            type: mod.type,
+            postId: mod.postId,
+            currentLangGroup: mod.lang_group,
+            newLangGroup: onlineLangGroup,
+            title: mod.title,
+            image: mod.image,
+            author: mod.author,
+            downloadUrl
+          });
+        }
+      }
+    } catch (err) {
+      console.error(`Error checking update for post ${mod.postId}:`, err);
+    }
+  }
+
+  res.json({ updates: results });
+});
+
 // API: List installed skins and sights (including disabled mods in separate folders)
 app.get('/api/installed', (req, res) => {
   const settings = loadSettings();

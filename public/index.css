@@ -1582,3 +1582,60 @@ select:focus {
   transform: none;
 }
 
+/* Update Available Badges & Buttons */
+.update-badge {
+  background: linear-gradient(135deg, var(--accent-primary), hsl(30, 100%, 50%));
+  color: var(--text-inverse);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  animation: pulse-glow 2s infinite alternate;
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 4px 8px rgba(255, 170, 0, 0.2);
+  }
+  100% {
+    box-shadow: 0 4px 14px rgba(255, 170, 0, 0.5);
+  }
+}
+
+.btn-update {
+  background: linear-gradient(135deg, var(--color-success), #1bd15d);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-weight: 700;
+  font-size: 12px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(27, 209, 93, 0.2);
+  transition: var(--transition-fast);
+}
+
+.btn-update:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(27, 209, 93, 0.3);
+}
+
+.btn-update:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: default;
+  transform: none;
+}
+
