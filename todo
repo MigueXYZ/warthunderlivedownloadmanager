@@ -7,13 +7,6 @@
   correspondente para a nova variante e atualiza internamente as linhas de substituição de textura do  .blk  para 
   corresponderem ao novo veículo.                                                                                 
                                                                                                                                                                                                                    
-                                                                                                                 
-  ### 5. 🏷️ Filtro de Conteúdo Permanente e Blacklist de Tags                                                     
-                                                                                                                
-  • Como funciona: Adicionar nas configurações uma lista de palavras-chave/hashtags ignoradas (ex: excluir        
-  permanentemente skins com tags fictícias, históricas ou anime, de acordo com a preferência do utilizador).      
-  • Detalhe Técnico: O backend filtra os posts retornados na rota server.js antes de enviar a resposta à UI. 
-                                                                                                                  
   ### 6. 🔔 Alerta de Skin Disponível em Jogo (In-Game Telemetry Companion Overlay)                               
                                                                                                                   
   • Como funciona: Quando o companheiro de telemetria (index.js) deteta que o jogador entrou numa partida ou

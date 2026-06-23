@@ -24,6 +24,8 @@ const elements = {
   wtPathInput: document.getElementById('wt-path-input'),
   sightsPathInput: document.getElementById('sights-path-input'),
   cookieInput: document.getElementById('cookie-input'),
+  blacklistInput: document.getElementById('blacklist-input'),
+  whitelistInput: document.getElementById('whitelist-input'),
   btnSaveSettings: document.getElementById('btn-save-settings'),
   pathStatusMsg: document.getElementById('path-status-msg'),
   sightsStatusMsg: document.getElementById('sights-status-msg'),
@@ -304,6 +306,16 @@ async function loadSettings() {
     if (data.cookie) {
       elements.cookieInput.value = data.cookie;
     }
+    if (data.blacklistTags) {
+      elements.blacklistInput.value = data.blacklistTags;
+    } else {
+      elements.blacklistInput.value = '';
+    }
+    if (data.whitelistTags) {
+      elements.whitelistInput.value = data.whitelistTags;
+    } else {
+      elements.whitelistInput.value = '';
+    }
   } catch (e) {
     showToast('Failed to load settings from server', 'error');
   }
@@ -314,12 +326,14 @@ async function saveSettings() {
   const wtPath = elements.wtPathInput.value.trim();
   const sightsPath = elements.sightsPathInput.value.trim();
   const cookie = elements.cookieInput.value.trim();
+  const blacklistTags = elements.blacklistInput.value.trim();
+  const whitelistTags = elements.whitelistInput.value.trim();
   
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wtPath, sightsPath, cookie })
+      body: JSON.stringify({ wtPath, sightsPath, cookie, blacklistTags, whitelistTags })
     });
     
     const data = await res.json();
@@ -338,7 +352,7 @@ async function saveSettings() {
 
       showToast('Settings saved successfully!', 'success');
       loadLibrary();
-      fetchFeed(); // Re-fetch feed in case cookie changes content visibility
+      fetchFeed(); // Re-fetch feed in case cookie or filters change content visibility
     } else {
       showToast(data.error || 'Failed to save settings.', 'error');
     }

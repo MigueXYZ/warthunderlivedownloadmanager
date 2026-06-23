@@ -18,7 +18,7 @@ const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 
 // Helper to load settings
 function loadSettings() {
-  let settings = { wtPath: '', sightsPath: '', cookie: '' };
+  let settings = { wtPath: '', sightsPath: '', cookie: '', blacklistTags: '', whitelistTags: '' };
   if (fs.existsSync(SETTINGS_FILE)) {
     try {
       settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
@@ -130,6 +130,8 @@ app.get('/api/settings', (req, res) => {
     wtPath: settings.wtPath,
     sightsPath: settings.sightsPath,
     cookie: settings.cookie || '',
+    blacklistTags: settings.blacklistTags || '',
+    whitelistTags: settings.whitelistTags || '',
     detectedWT: autoDetectWTPath(),
     detectedSights: autoDetectUserSightsPath(),
     isWTValid: settings.wtPath ? fs.existsSync(settings.wtPath) : false,
@@ -139,10 +141,12 @@ app.get('/api/settings', (req, res) => {
 
 // API: Update settings
 app.post('/api/settings', (req, res) => {
-  const { wtPath, sightsPath, cookie } = req.body;
+  const { wtPath, sightsPath, cookie, blacklistTags, whitelistTags } = req.body;
   const cleanWT = wtPath ? wtPath.trim() : '';
   const cleanSights = sightsPath ? sightsPath.trim() : '';
   const cleanCookie = cookie ? cookie.trim() : '';
+  const cleanBlacklist = blacklistTags ? blacklistTags.trim() : '';
+  const cleanWhitelist = whitelistTags ? whitelistTags.trim() : '';
 
   if (cleanWT && !fs.existsSync(cleanWT)) {
     return res.status(400).json({ error: 'War Thunder game folder path does not exist.' });
@@ -158,7 +162,13 @@ app.post('/api/settings', (req, res) => {
     }
   }
 
-  const settings = { wtPath: cleanWT, sightsPath: cleanSights, cookie: cleanCookie };
+  const settings = { 
+    wtPath: cleanWT, 
+    sightsPath: cleanSights, 
+    cookie: cleanCookie,
+    blacklistTags: cleanBlacklist,
+    whitelistTags: cleanWhitelist
+  };
   saveSettings(settings);
   ensureSubdirsExist(cleanWT, cleanSights);
 
@@ -203,6 +213,54 @@ app.post('/api/feed', async (req, res) => {
     }
 
     const data = await response.json();
+
+    // Apply Blacklist & Whitelist filtering if response is successful
+    if (data.status === 'OK' && data.data && Array.isArray(data.data.list)) {
+      let list = data.data.list;
+
+      // 1. Blacklist Filtering
+      if (settings.blacklistTags) {
+        const blacklist = settings.blacklistTags
+          .split(',')
+          .map(t => t.trim().toLowerCase())
+          .filter(t => t.length > 0);
+
+        if (blacklist.length > 0) {
+          list = list.filter(item => {
+            const desc = (item.description || '').toLowerCase();
+            for (const tag of blacklist) {
+              if (desc.includes(tag)) {
+                return false;
+              }
+            }
+            return true;
+          });
+        }
+      }
+
+      // 2. Whitelist Filtering
+      if (settings.whitelistTags) {
+        const whitelist = settings.whitelistTags
+          .split(',')
+          .map(t => t.trim().toLowerCase())
+          .filter(t => t.length > 0);
+
+        if (whitelist.length > 0) {
+          list = list.filter(item => {
+            const desc = (item.description || '').toLowerCase();
+            for (const tag of whitelist) {
+              if (desc.includes(tag)) {
+                return true;
+              }
+            }
+            return false;
+          });
+        }
+      }
+
+      data.data.list = list;
+    }
+
     res.json(data);
   } catch (err) {
     console.error('Error fetching WT Live feed:', err);

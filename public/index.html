@@ -71,6 +71,16 @@
           </div>
           <div class="settings-row">
             <div class="settings-field">
+              <label for="blacklist-input" title="Comma-separated list of tags to hide (e.g. #anime, #fictional)">Blacklist Tags:</label>
+              <input type="text" id="blacklist-input" placeholder="e.g. #anime, #fictional (hides matching content)">
+            </div>
+            <div class="settings-field">
+              <label for="whitelist-input" title="Comma-separated list of tags to show exclusively (e.g. #historical)">Whitelist Tags:</label>
+              <input type="text" id="whitelist-input" placeholder="e.g. #historical (shows only matching content, leave empty for all)">
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-field">
               <label for="cookie-input" title="Gaijin Session Cookie (identity_sid)">Session Cookie:</label>
               <input type="text" id="cookie-input" placeholder="Paste identity_sid cookie to unlock restricted content (Optional)">
               <span class="path-status info" id="cookie-status-msg" style="color: var(--accent-secondary); cursor: pointer;" onclick="alert('To get your cookie:\n1. Log in to live.warthunder.com in your browser.\n2. Press F12 (DevTools) > Application (or Storage) > Cookies.\n3. Click live.warthunder.com and copy the value of the \'identity_sid\' cookie.')">❓ How to get</span>
