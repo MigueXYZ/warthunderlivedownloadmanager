@@ -29,6 +29,9 @@
         <button class="nav-item" id="btn-tab-library" onclick="switchTab('library')">
           <span class="icon">📦</span> My Library
         </button>
+        <button class="nav-item" id="btn-tab-queue" onclick="switchTab('queue')">
+          <span class="icon">📥</span> Downloads <span class="badge hidden" id="count-queue">0</span>
+        </button>
       </nav>
 
       <!-- Telemetry companion box -->
@@ -178,6 +181,40 @@
             <h3>Sights <span class="badge" id="count-sights">0</span></h3>
             <div class="list-container" id="sights-list">
               <!-- Sights list items -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Queue Tab -->
+      <section class="tab-content" id="tab-queue">
+        <div class="library-header">
+          <h2>Downloads & Queue</h2>
+          <button class="btn-secondary" onclick="clearQueueHistory()">🧹 Clear History</button>
+        </div>
+
+        <div class="queue-container">
+          <!-- Active Download -->
+          <div class="queue-section">
+            <h3>Active Download</h3>
+            <div id="active-download-container">
+              <div class="no-downloads-msg">No active downloads.</div>
+            </div>
+          </div>
+
+          <!-- Pending Queue -->
+          <div class="queue-section">
+            <h3>Pending Queue</h3>
+            <div id="pending-queue-container">
+              <div class="no-downloads-msg">No pending items in queue.</div>
+            </div>
+          </div>
+
+          <!-- Download History -->
+          <div class="queue-section">
+            <h3>Download History</h3>
+            <div id="history-queue-container">
+              <div class="no-downloads-msg">No download history.</div>
             </div>
           </div>
         </div>

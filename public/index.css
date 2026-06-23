@@ -1347,3 +1347,238 @@ select:focus {
   color: #fff;
 }
 
+/* Downloads Queue Tab Styling */
+.queue-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  max-height: calc(100vh - 180px);
+  padding-right: 4px;
+}
+
+.queue-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.queue-section h3 {
+  font-family: var(--font-family-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.no-downloads-msg {
+  background: var(--bg-card);
+  border: 1px dashed var(--border-color-hover);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.download-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.download-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-color-hover);
+}
+
+.download-img {
+  width: 96px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.download-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.download-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.download-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.download-type-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.download-type-badge.skin {
+  background: hsla(38, 100%, 52%, 0.1);
+  color: var(--accent-primary);
+  border: 1px solid hsla(38, 100%, 52%, 0.2);
+}
+
+.download-type-badge.sight {
+  background: hsla(200, 100%, 50%, 0.1);
+  color: var(--accent-secondary);
+  border: 1px solid hsla(200, 100%, 50%, 0.2);
+}
+
+.download-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.download-meta span {
+  color: var(--text-muted);
+}
+
+.download-status-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.download-progress-bar {
+  background: var(--bg-input);
+  border-radius: 4px;
+  height: 6px;
+  flex-grow: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.download-progress-fill {
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.download-status-text {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.download-status-text.pending {
+  color: var(--text-muted);
+}
+
+.download-status-text.downloading {
+  color: var(--accent-primary);
+}
+
+.download-status-text.extracting {
+  color: var(--accent-secondary);
+}
+
+.download-status-text.completed {
+  color: var(--color-success);
+}
+
+.download-status-text.failed {
+  color: var(--color-error);
+}
+
+.download-status-text.cancelled {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.download-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-cancel-dl {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-cancel-dl:hover {
+  background: rgba(255, 0, 0, 0.1);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Button Status Overrides in results-grid */
+.btn-install.queued {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--accent-secondary);
+  color: var(--accent-secondary);
+  box-shadow: none;
+  cursor: default;
+}
+.btn-install.queued:hover {
+  transform: none;
+}
+
+.btn-install.downloading {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: none;
+  cursor: default;
+}
+.btn-install.downloading:hover {
+  transform: none;
+}
+
+.btn-install.extracting {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--accent-secondary);
+  color: var(--accent-secondary);
+  box-shadow: none;
+  cursor: default;
+}
+.btn-install.extracting:hover {
+  transform: none;
+}
+

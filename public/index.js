@@ -9,6 +9,7 @@ const state = {
   sort: 'downloads',
   page: 0,
   installedList: { skins: [], sights: [] },
+  queueList: { active: null, queue: [], history: [] },
   wtPathValid: false,
   sightsPathValid: false,
   telemetryActive: false,
@@ -45,14 +46,21 @@ const elements = {
   
   tabBrowse: document.getElementById('tab-browse'),
   tabLibrary: document.getElementById('tab-library'),
+  tabQueue: document.getElementById('tab-queue'),
   btnTabBrowse: document.getElementById('btn-tab-browse'),
   btnTabLibrary: document.getElementById('btn-tab-library'),
+  btnTabQueue: document.getElementById('btn-tab-queue'),
   
   countSkins: document.getElementById('count-skins'),
   countSights: document.getElementById('count-sights'),
+  countQueue: document.getElementById('count-queue'),
   skinsList: document.getElementById('skins-list'),
   sightsList: document.getElementById('sights-list'),
   librarySearchInput: document.getElementById('library-search-input'),
+  
+  activeDownloadContainer: document.getElementById('active-download-container'),
+  pendingQueueContainer: document.getElementById('pending-queue-container'),
+  historyQueueContainer: document.getElementById('history-queue-container'),
   
   telemetryPanel: document.getElementById('telemetry-panel'),
   telemetryPulse: document.getElementById('telemetry-pulse'),
@@ -80,6 +88,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Start telemetry polling
   pollTelemetry();
   setInterval(pollTelemetry, 2000);
+
+  // Start download queue polling
+  pollQueue();
+  setInterval(pollQueue, 1500);
   
   // Set up event listeners
   setupEventListeners();
@@ -237,17 +249,28 @@ function formatVehicleForSearch(vehicleName) {
 function switchTab(tab) {
   state.activeTab = tab;
   
+  // Hide all tab sections
+  elements.tabBrowse.classList.remove('active');
+  elements.tabLibrary.classList.remove('active');
+  elements.tabQueue.classList.remove('active');
+  
+  // Deactivate all navigation items
+  elements.btnTabBrowse.classList.remove('active');
+  elements.btnTabLibrary.classList.remove('active');
+  elements.btnTabQueue.classList.remove('active');
+  
+  // Activate selected tab
   if (tab === 'browse') {
     elements.tabBrowse.classList.add('active');
-    elements.tabLibrary.classList.remove('active');
     elements.btnTabBrowse.classList.add('active');
-    elements.btnTabLibrary.classList.remove('active');
-  } else {
-    elements.tabBrowse.classList.remove('active');
+  } else if (tab === 'library') {
     elements.tabLibrary.classList.add('active');
-    elements.btnTabBrowse.classList.remove('active');
     elements.btnTabLibrary.classList.add('active');
     loadLibrary(); // Reload installed list
+  } else if (tab === 'queue') {
+    elements.tabQueue.classList.add('active');
+    elements.btnTabQueue.classList.add('active');
+    pollQueue(); // Poll immediately when switching to queue
   }
 }
 
@@ -520,18 +543,34 @@ function renderCards(list) {
     
     const isInstalled = isModInstalled(item);
 
+    // Determine button class and label based on queue status
+    let btnClass = 'btn-install';
+    let btnText = '📥 Install';
+    let btnDisabled = '';
+
+    if (isInstalled) {
+      btnClass += ' installed';
+      btnText = '✓ Installed';
+      btnDisabled = 'disabled';
+    } else if (state.queueList && state.queueList.active && state.queueList.active.postId === item.id) {
+      const active = state.queueList.active;
+      if (active.status === 'downloading') {
+        btnClass += ' downloading';
+        btnText = `⏳ downloading (${active.progress}%)`;
+      } else if (active.status === 'extracting') {
+        btnClass += ' extracting';
+        btnText = `⚙️ Extracting...`;
+      }
+      btnDisabled = 'disabled';
+    } else if (state.queueList && state.queueList.queue && state.queueList.queue.some(q => q.postId === item.id)) {
+      btnClass += ' queued';
+      btnText = '✓ Queued';
+      btnDisabled = 'disabled';
+    }
+
     // Extract a readable post title from the description, falling back to the filename
     const cleanModName = getPostTitle(item);
-
-    // Strip HTML from description to get a clean snippet
     const rawDescText = stripHtml(item.description || '');
-    let descSnippet = rawDescText.trim();
-    if (descSnippet.length > 110) {
-      descSnippet = descSnippet.substring(0, 107) + '...';
-    }
-    if (!descSnippet) {
-      descSnippet = 'No description details provided.';
-    }
 
     // Map all images to an array of URLs for our gallery carousel
     const imagesList = (item.images && item.images.length > 0) ? item.images.map(img => img.src) : [imageUrl];
@@ -586,10 +625,11 @@ function renderCards(list) {
           <span class="file-name" title="${item.file.name}">${item.file.name}</span>
           <span class="file-size">${sizeMb} MB</span>
         </div>
-        <button class="btn-install ${isInstalled ? 'installed' : ''}" 
-                onclick="installModById(${item.id}, this)"
-                ${isInstalled ? 'disabled' : ''}>
-          ${isInstalled ? '✓ Installed' : '📥 Install'}
+        <button class="${btnClass}" 
+                data-id="${item.id}"
+                onclick="addModToQueueById(${item.id}, this)"
+                ${btnDisabled}>
+          ${btnText}
         </button>
       </div>
     `;
@@ -1288,4 +1328,299 @@ function classifyItem(item) {
   }
 
   return { country: detectedCountry, type: detectedType };
+}
+
+// Global window functions for the Queue
+window.cancelDownload = cancelDownload;
+window.clearQueueHistory = clearQueueHistory;
+window.addModToQueueById = addModToQueueById;
+window.pollQueue = pollQueue;
+
+// ==========================================
+// DOWNLOAD QUEUE HANDLERS & RENDERING
+// ==========================================
+
+// Add a modification to the download queue
+async function addModToQueueById(id, btnElement) {
+  const item = state.currentFeedList.find(x => x.id === id);
+  if (!item) {
+    showToast('Failed to find mod data in cache.', 'error');
+    return;
+  }
+  
+  const type = item.type || state.contentType;
+  if (type === 'camouflage' && !state.wtPathValid) {
+    showToast('Please set and save a valid War Thunder Game Folder first!', 'warning');
+    return;
+  }
+  if (type === 'sight' && !state.sightsPathValid) {
+    showToast('Please set and save a valid Custom Sights Folder first!', 'warning');
+    return;
+  }
+
+  // Instant UI feedback
+  if (btnElement) {
+    btnElement.className = 'btn-install queued';
+    btnElement.innerText = '✓ Queued';
+    btnElement.disabled = true;
+  }
+
+  const url = item.file.link;
+  const name = item.file.name;
+  const lang_group = item.lang_group;
+  const postId = item.id;
+  const title = getPostTitle(item);
+  const image = (item.images && item.images.length > 0) ? item.images[0].src : '';
+  const author = item.author ? { nickname: item.author.nickname, avatar: item.author.avatar } : null;
+
+  try {
+    const res = await fetch('/api/queue/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, type, name, lang_group, postId, title, image, author })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      showToast('Added to download queue!', 'success');
+      pollQueue();
+    } else {
+      showToast(data.error || 'Failed to add to queue.', 'error');
+      if (btnElement) {
+        btnElement.className = 'btn-install';
+        btnElement.innerText = '📥 Install';
+        btnElement.disabled = false;
+      }
+    }
+  } catch (e) {
+    showToast('Connection error adding to queue.', 'error');
+    if (btnElement) {
+      btnElement.className = 'btn-install';
+      btnElement.innerText = '📥 Install';
+      btnElement.disabled = false;
+    }
+  }
+}
+
+// Cancel a queued or active download
+async function cancelDownload(id) {
+  try {
+    const res = await fetch('/api/queue/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Download cancelled.', 'info');
+      pollQueue();
+      loadLibrary();
+    } else {
+      showToast(data.error || 'Failed to cancel download.', 'error');
+    }
+  } catch (e) {
+    showToast('Failed to cancel download.', 'error');
+  }
+}
+
+// Clear finished downloads from history
+async function clearQueueHistory() {
+  try {
+    const res = await fetch('/api/queue/clear-history', {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Download history cleared.', 'success');
+      pollQueue();
+    }
+  } catch (e) {
+    showToast('Failed to clear download history.', 'error');
+  }
+}
+
+// Render queue section contents
+function renderQueueLists() {
+  const active = state.queueList.active;
+  const queue = state.queueList.queue;
+  const history = state.queueList.history;
+
+  // 1. Render Active Download
+  if (active) {
+    const progressFill = active.progress || 0;
+    const thumbnail = active.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
+    const cleanTitle = active.title || active.name;
+    const authorName = active.author ? active.author.nickname : 'Anonymous';
+    
+    let statusText = 'Pending...';
+    if (active.status === 'downloading') {
+      statusText = `Downloading (${progressFill}%)`;
+    } else if (active.status === 'extracting') {
+      statusText = 'Extracting ZIP...';
+    }
+
+    elements.activeDownloadContainer.innerHTML = `
+      <div class="download-card">
+        <img class="download-img" src="${thumbnail}" alt="${cleanTitle}">
+        <div class="download-info">
+          <div class="download-title-row">
+            <span class="download-type-badge ${active.type === 'sight' ? 'sight' : 'skin'}">${active.type === 'sight' ? 'Sight' : 'Skin'}</span>
+            <h4 class="download-title" title="${cleanTitle}">${cleanTitle}</h4>
+          </div>
+          <div class="download-meta">By <span>${authorName}</span></div>
+          <div class="download-status-container">
+            <div class="download-progress-bar">
+              <div class="download-progress-fill" style="width: ${progressFill}%"></div>
+            </div>
+            <span class="download-status-text ${active.status}">${statusText}</span>
+          </div>
+        </div>
+        <div class="download-actions">
+          <button class="btn-cancel-dl" onclick="cancelDownload('${active.id}')">Cancel</button>
+        </div>
+      </div>
+    `;
+  } else {
+    elements.activeDownloadContainer.innerHTML = `<div class="no-downloads-msg">No active downloads.</div>`;
+  }
+
+  // 2. Render Pending Queue
+  if (queue && queue.length > 0) {
+    elements.pendingQueueContainer.innerHTML = queue.map(item => {
+      const thumbnail = item.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
+      const cleanTitle = item.title || item.name;
+      const authorName = item.author ? item.author.nickname : 'Anonymous';
+      
+      return `
+        <div class="download-card" style="margin-bottom: 8px;">
+          <img class="download-img" src="${thumbnail}" alt="${cleanTitle}">
+          <div class="download-info">
+            <div class="download-title-row">
+              <span class="download-type-badge ${item.type === 'sight' ? 'sight' : 'skin'}">${item.type === 'sight' ? 'Sight' : 'Skin'}</span>
+              <h4 class="download-title" title="${cleanTitle}">${cleanTitle}</h4>
+            </div>
+            <div class="download-meta">By <span>${authorName}</span></div>
+            <div class="download-status-container">
+              <span class="download-status-text pending">Queued (Waiting...)</span>
+            </div>
+          </div>
+          <div class="download-actions">
+            <button class="btn-cancel-dl" onclick="cancelDownload('${item.id}')">Remove</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    elements.pendingQueueContainer.innerHTML = `<div class="no-downloads-msg">No pending items in queue.</div>`;
+  }
+
+  // 3. Render Download History
+  if (history && history.length > 0) {
+    elements.historyQueueContainer.innerHTML = history.map(item => {
+      const thumbnail = item.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
+      const cleanTitle = item.title || item.name;
+      const authorName = item.author ? item.author.nickname : 'Anonymous';
+      
+      let statusLabel = 'Finished';
+      if (item.status === 'completed') statusLabel = 'Installed';
+      else if (item.status === 'failed') statusLabel = `Failed: ${item.error || 'unknown error'}`;
+      else if (item.status === 'cancelled') statusLabel = 'Cancelled';
+
+      return `
+        <div class="download-card" style="margin-bottom: 8px; opacity: 0.75;">
+          <img class="download-img" src="${thumbnail}" alt="${cleanTitle}">
+          <div class="download-info">
+            <div class="download-title-row">
+              <span class="download-type-badge ${item.type === 'sight' ? 'sight' : 'skin'}">${item.type === 'sight' ? 'Sight' : 'Skin'}</span>
+              <h4 class="download-title" title="${cleanTitle}">${cleanTitle}</h4>
+            </div>
+            <div class="download-meta">By <span>${authorName}</span></div>
+            <div class="download-status-container">
+              <span class="download-status-text ${item.status}">${statusLabel}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    elements.historyQueueContainer.innerHTML = `<div class="no-downloads-msg">No download history.</div>`;
+  }
+}
+
+// Poll download queue API
+async function pollQueue() {
+  try {
+    const res = await fetch('/api/queue');
+    const data = await res.json();
+    
+    state.queueList = data;
+    
+    // Update sidebar tab badge
+    const count = data.queue.length + (data.active ? 1 : 0);
+    if (count > 0) {
+      elements.countQueue.innerText = count;
+      elements.countQueue.classList.remove('hidden');
+    } else {
+      elements.countQueue.classList.add('hidden');
+    }
+    
+    // If active tab is queue, render the lists
+    if (state.activeTab === 'queue') {
+      renderQueueLists();
+    }
+    
+    // Update cards grid button states on the fly
+    updateResultsGridButtonStates();
+  } catch (e) {
+    console.error('Failed to poll queue status:', e);
+  }
+}
+
+// Dynamically refresh feed install buttons state
+function updateResultsGridButtonStates() {
+  const installButtons = document.querySelectorAll('.results-grid .btn-install');
+  if (installButtons.length === 0) return;
+
+  installButtons.forEach(btn => {
+    const idAttr = btn.getAttribute('data-id');
+    if (!idAttr) return;
+    const postId = parseInt(idAttr, 10);
+
+    const item = state.currentFeedList.find(x => x.id === postId);
+    if (!item) return;
+
+    const isInstalled = isModInstalled(item);
+
+    if (isInstalled) {
+      btn.className = 'btn-install installed';
+      btn.innerText = '✓ Installed';
+      btn.disabled = true;
+      return;
+    }
+
+    if (state.queueList.active && state.queueList.active.postId === postId) {
+      const active = state.queueList.active;
+      if (active.status === 'downloading') {
+        btn.className = 'btn-install downloading';
+        btn.innerText = `⏳ downloading (${active.progress}%)`;
+      } else if (active.status === 'extracting') {
+        btn.className = 'btn-install extracting';
+        btn.innerText = `⚙️ Extracting...`;
+      }
+      btn.disabled = true;
+      return;
+    }
+
+    const queuedItem = state.queueList.queue.find(q => q.postId === postId);
+    if (queuedItem) {
+      btn.className = 'btn-install queued';
+      btn.innerText = '✓ Queued';
+      btn.disabled = true;
+      return;
+    }
+
+    btn.className = 'btn-install';
+    btn.innerText = '📥 Install';
+    btn.disabled = false;
+  });
 }

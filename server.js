@@ -237,6 +237,307 @@ async function downloadFile(url, destPath, cookie) {
   fileStream.end();
 }
 
+// Queue State
+let downloadQueue = [];
+let currentActiveDownload = null;
+let downloadHistory = [];
+let isProcessingQueue = false;
+
+// Helper function to download file from URL with support for AbortSignal and progress reporting
+async function downloadFileWithSignal(url, destPath, cookie, signal, onProgress) {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+  };
+
+  if (cookie) {
+    headers['Cookie'] = `identity_sid=${cookie}`;
+  }
+
+  const response = await fetch(url, { headers, signal });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download file: ${response.statusText} (${response.status})`);
+  }
+
+  const totalBytes = parseInt(response.headers.get('content-length'), 10) || 0;
+  let downloadedBytes = 0;
+
+  const fileStream = fs.createWriteStream(destPath);
+  const reader = response.body.getReader();
+
+  try {
+    while (true) {
+      if (signal && signal.aborted) {
+        throw new Error('Download aborted');
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      fileStream.write(Buffer.from(value));
+      downloadedBytes += value.length;
+      if (totalBytes && onProgress) {
+        const pct = Math.round((downloadedBytes / totalBytes) * 100);
+        onProgress(pct);
+      }
+    }
+  } finally {
+    fileStream.end();
+  }
+}
+
+// Background queue processor
+async function processQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+
+  while (downloadQueue.length > 0) {
+    const itemIndex = downloadQueue.findIndex(x => x.status === 'pending');
+    if (itemIndex === -1) break;
+
+    const item = downloadQueue[itemIndex];
+    currentActiveDownload = item;
+    
+    item.status = 'downloading';
+    item.progress = 0;
+    
+    const settings = loadSettings();
+    const tempDir = path.join(__dirname, 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const safeName = item.name.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+    const tempZipPath = path.join(tempDir, safeName);
+    
+    item.abortController = new AbortController();
+
+    try {
+      if (item.type === 'camouflage' && (!settings.wtPath || !fs.existsSync(settings.wtPath))) {
+        throw new Error('War Thunder game folder path is not set or invalid.');
+      }
+      if (item.type === 'sight' && (!settings.sightsPath || !fs.existsSync(settings.sightsPath))) {
+        throw new Error('User Sights path is not set or invalid.');
+      }
+
+      console.log(`[Queue] Starting download for: ${item.title}`);
+      
+      await downloadFileWithSignal(
+        item.url, 
+        tempZipPath, 
+        settings.cookie, 
+        item.abortController.signal, 
+        (pct) => {
+          item.progress = pct;
+        }
+      );
+
+      if (item.status === 'cancelled') {
+        throw new Error('Download cancelled by user.');
+      }
+
+      item.status = 'extracting';
+      item.progress = 100;
+      console.log(`[Queue] Extracting zip for: ${item.title}`);
+
+      // Incrementar contagem de download no WT Live
+      if (item.lang_group) {
+        try {
+          const downloadHeaders = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          };
+          if (settings.cookie) {
+            downloadHeaders['Cookie'] = `identity_sid=${settings.cookie}`;
+          }
+          await fetch('https://live.warthunder.com/api/post/downloaded/', {
+            method: 'POST',
+            headers: downloadHeaders,
+            body: `lang_group=${item.lang_group}`
+          });
+        } catch (e) {
+          console.error('Failed to notify WT Live download count:', e);
+        }
+      }
+
+      const zip = new AdmZip(tempZipPath);
+      const entries = zip.getEntries();
+
+      // Determinar diretório de destino
+      let targetBaseDir = '';
+      if (item.type === 'camouflage') {
+        targetBaseDir = path.join(settings.wtPath, 'UserSkins');
+      } else if (item.type === 'sight') {
+        targetBaseDir = path.join(settings.sightsPath, 'all_tanks');
+      } else {
+        targetBaseDir = path.join(settings.wtPath, 'UserSkins');
+      }
+
+      if (!fs.existsSync(targetBaseDir)) {
+        fs.mkdirSync(targetBaseDir, { recursive: true });
+      }
+
+      let createdFolder = '';
+
+      if (item.type === 'sight') {
+        const blkEntries = entries.filter(e => !e.isDirectory && e.entryName.toLowerCase().endsWith('.blk'));
+        if (blkEntries.length === 0) {
+          throw new Error('No .blk sight files found in the download ZIP archive.');
+        }
+        
+        const cleanZipName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
+        const modSightsDir = path.join(settings.sightsPath, cleanZipName, 'all_tanks');
+        
+        if (!fs.existsSync(modSightsDir)) {
+          fs.mkdirSync(modSightsDir, { recursive: true });
+        }
+
+        for (const entry of blkEntries) {
+          const entryData = entry.getData();
+          const originalFileName = path.basename(entry.entryName);
+          const finalDestPath = path.join(modSightsDir, originalFileName);
+          fs.writeFileSync(finalDestPath, entryData);
+        }
+        
+        fs.unlinkSync(tempZipPath);
+        createdFolder = cleanZipName;
+
+        const metadataFolder = path.join(settings.sightsPath, cleanZipName);
+        if (fs.existsSync(metadataFolder)) {
+          writeQueueMetadata(metadataFolder, item);
+        }
+      } else {
+        // Smart Extraction para Skins
+        let hasRootFiles = false;
+        let rootFolders = new Set();
+
+        for (const entry of entries) {
+          if (!entry.isDirectory) {
+            const parts = entry.entryName.split('/');
+            if (parts.length === 1) {
+              hasRootFiles = true;
+            } else {
+              rootFolders.add(parts[0]);
+            }
+          }
+        }
+
+        let extractionPath = targetBaseDir;
+        let zipHasWTFolderRoot = false;
+        let rootFolderName = '';
+        if (rootFolders.size === 1) {
+          rootFolderName = Array.from(rootFolders)[0];
+          const lowerRoot = rootFolderName.toLowerCase();
+          if (lowerRoot === 'userskins' || lowerRoot === 'usersights' || lowerRoot === 'all_tanks') {
+            zipHasWTFolderRoot = true;
+          }
+        }
+
+        if (zipHasWTFolderRoot) {
+          const lowerRoot = rootFolderName.toLowerCase();
+          if (lowerRoot === 'userskins') {
+            extractionPath = settings.wtPath;
+          } else if (lowerRoot === 'usersights') {
+            extractionPath = path.dirname(settings.sightsPath);
+          } else if (lowerRoot === 'all_tanks') {
+            extractionPath = settings.sightsPath;
+          }
+
+          const prefix = rootFolderName + '/';
+          const subFolders = new Set();
+          for (const entry of entries) {
+            if (!entry.isDirectory && entry.entryName.startsWith(prefix)) {
+              const remainingPath = entry.entryName.substring(prefix.length);
+              const parts = remainingPath.split('/');
+              if (parts.length > 0) {
+                subFolders.add(parts[0]);
+              }
+            }
+          }
+          if (subFolders.size === 1) {
+            createdFolder = Array.from(subFolders)[0];
+          } else {
+            createdFolder = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
+          }
+        } else {
+          if (hasRootFiles || rootFolders.size > 1) {
+            const folderName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
+            extractionPath = path.join(targetBaseDir, folderName);
+            createdFolder = folderName;
+            if (!fs.existsSync(extractionPath)) {
+              fs.mkdirSync(extractionPath, { recursive: true });
+            }
+          } else if (rootFolders.size === 1) {
+            createdFolder = Array.from(rootFolders)[0];
+          }
+        }
+
+        zip.extractAllTo(extractionPath, true);
+        fs.unlinkSync(tempZipPath);
+
+        const metadataFolder = path.join(targetBaseDir, createdFolder);
+        if (fs.existsSync(metadataFolder)) {
+          writeQueueMetadata(metadataFolder, item);
+        }
+      }
+
+      item.status = 'completed';
+      item.progress = 100;
+      item.completedAt = Date.now();
+      console.log(`[Queue] Completed installation for: ${item.title}`);
+
+    } catch (err) {
+      if (fs.existsSync(tempZipPath)) {
+        try { fs.unlinkSync(tempZipPath); } catch (_) {}
+      }
+
+      if (item.status === 'cancelled') {
+        console.log(`[Queue] Cancelled: ${item.title}`);
+      } else {
+        item.status = 'failed';
+        item.error = err.message;
+        console.error(`[Queue] Failed installation for: ${item.title}`, err);
+      }
+      item.completedAt = Date.now();
+    } finally {
+      delete item.abortController;
+      
+      const idx = downloadQueue.findIndex(x => x.id === item.id);
+      if (idx !== -1) {
+        downloadQueue.splice(idx, 1);
+      }
+      downloadHistory.unshift(item);
+      if (downloadHistory.length > 50) {
+        downloadHistory.pop();
+      }
+      
+      currentActiveDownload = null;
+    }
+  }
+
+  isProcessingQueue = false;
+}
+
+function writeQueueMetadata(folder, item) {
+  try {
+    const metadata = {
+      postId: item.postId ? parseInt(item.postId, 10) : null,
+      lang_group: item.lang_group ? parseInt(item.lang_group, 10) : null,
+      fileName: item.name,
+      type: item.type,
+      title: item.title || null,
+      image: item.image || null,
+      author: item.author || null,
+      installedAt: Date.now()
+    };
+    fs.writeFileSync(
+      path.join(folder, '.wtlive.json'),
+      JSON.stringify(metadata, null, 2),
+      'utf8'
+    );
+  } catch (err) {
+    console.error('Error writing metadata file in queue:', err);
+  }
+}
+
 // API: Trigger download and installation of a skin/sight
 app.post('/api/download', async (req, res) => {
   const { url, type, name, lang_group, postId, title, image, author } = req.body;
@@ -483,6 +784,110 @@ app.post('/api/download', async (req, res) => {
     }
     res.status(500).json({ error: `Installation failed: ${err.message}` });
   }
+});
+
+// API: Get download queue status
+app.get('/api/queue', (req, res) => {
+  const cleanQueue = downloadQueue.map(item => {
+    const { abortController, ...rest } = item;
+    return rest;
+  });
+  const cleanActive = currentActiveDownload ? { 
+    id: currentActiveDownload.id,
+    url: currentActiveDownload.url,
+    type: currentActiveDownload.type,
+    name: currentActiveDownload.name,
+    lang_group: currentActiveDownload.lang_group,
+    postId: currentActiveDownload.postId,
+    title: currentActiveDownload.title,
+    image: currentActiveDownload.image,
+    author: currentActiveDownload.author,
+    status: currentActiveDownload.status,
+    progress: currentActiveDownload.progress,
+    error: currentActiveDownload.error,
+    addedAt: currentActiveDownload.addedAt
+  } : null;
+  const cleanHistory = downloadHistory.map(item => {
+    const { abortController, ...rest } = item;
+    return rest;
+  });
+  res.json({
+    active: cleanActive,
+    queue: cleanQueue,
+    history: cleanHistory
+  });
+});
+
+// API: Add item to download queue
+app.post('/api/queue/add', (req, res) => {
+  const { url, type, name, lang_group, postId, title, image, author } = req.body;
+
+  if (!url || !type || !name) {
+    return res.status(400).json({ error: 'Missing required parameters: url, type, name.' });
+  }
+
+  const inQueue = downloadQueue.some(x => x.postId === postId) || (currentActiveDownload && currentActiveDownload.postId === postId);
+  if (inQueue) {
+    return res.status(400).json({ error: 'This item is already in the download queue or installing.' });
+  }
+
+  const newItem = {
+    id: 'dl_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+    url,
+    type,
+    name,
+    lang_group: lang_group ? parseInt(lang_group, 10) : null,
+    postId: postId ? parseInt(postId, 10) : null,
+    title,
+    image,
+    author,
+    status: 'pending',
+    progress: 0,
+    error: null,
+    addedAt: Date.now()
+  };
+
+  downloadQueue.push(newItem);
+  res.json({ success: true, message: 'Added to download queue.', item: newItem });
+
+  processQueue();
+});
+
+// API: Cancel active or queued download
+app.post('/api/queue/cancel', (req, res) => {
+  const { id } = req.body;
+  if (!id) {
+    return res.status(400).json({ error: 'Missing parameter: id' });
+  }
+
+  if (currentActiveDownload && currentActiveDownload.id === id) {
+    currentActiveDownload.status = 'cancelled';
+    if (currentActiveDownload.abortController) {
+      try {
+        currentActiveDownload.abortController.abort();
+      } catch (e) {
+        console.error('Error aborting active download:', e);
+      }
+    }
+    return res.json({ success: true, message: 'Active download cancellation triggered.' });
+  }
+
+  const index = downloadQueue.findIndex(x => x.id === id);
+  if (index !== -1) {
+    const removed = downloadQueue.splice(index, 1)[0];
+    removed.status = 'cancelled';
+    removed.completedAt = Date.now();
+    downloadHistory.unshift(removed);
+    return res.json({ success: true, message: 'Pending download cancelled.' });
+  }
+
+  res.status(404).json({ error: 'Download item not found in queue or active downloads.' });
+});
+
+// API: Clear completed/failed history
+app.post('/api/queue/clear-history', (req, res) => {
+  downloadHistory = [];
+  res.json({ success: true, message: 'Download history cleared.' });
 });
 
 // API: List installed skins and sights (including disabled mods in separate folders)
