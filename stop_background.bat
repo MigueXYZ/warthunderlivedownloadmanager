@@ -4,14 +4,14 @@
 
 cd /d "%~dp0"
 
-echo [INFO] A procurar o processo na porta 3000...
+echo [INFO] A procurar o processo ativo na porta 3000...
 set PID=
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3000') do (
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr /c:":3000 " ^| findstr "LISTENING"') do (
     set PID=%%a
 )
 
 if "%PID%"=="" (
-    echo [WARNING] Nenhum processo foi encontrado a correr na porta 3000.
+    echo [WARNING] Nenhum processo ativo foi encontrado a correr na porta 3000.
     pause
     exit /b
 )

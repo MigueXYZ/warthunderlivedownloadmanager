@@ -4,8 +4,8 @@
 
 cd /d "%~dp0"
 
-:: Verificar se o servidor já está ativo na porta 3000
-netstat -ano | findstr :3000 >nul
+:: Verificar se o servidor já está ativo na porta 3000 (apenas em estado LISTENING)
+netstat -aon | findstr /c:":3000 " | findstr "LISTENING" >nul
 if %errorlevel% equ 0 (
     echo [INFO] O servidor ja esta a correr na porta 3000.
     pause
@@ -13,7 +13,9 @@ if %errorlevel% equ 0 (
 )
 
 echo [INFO] A iniciar o War Thunder Live Download Manager em background...
-echo CreateObject("Wscript.Shell").Run "node server.js", 0, False > "%temp%\wt_live_run.vbs"
+echo Set objShell = CreateObject("Wscript.Shell") > "%temp%\wt_live_run.vbs"
+echo objShell.CurrentDirectory = "%~dp0" >> "%temp%\wt_live_run.vbs"
+echo objShell.Run "node server.js", 0, False >> "%temp%\wt_live_run.vbs"
 wscript.exe "%temp%\wt_live_run.vbs"
 del "%temp%\wt_live_run.vbs"
 
