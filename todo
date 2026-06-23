@@ -6,14 +6,7 @@
   • Detalhe Técnico: Um utilitário que copia a pasta da skin escolhida, duplica e renomeia o ficheiro  .blk       
   correspondente para a nova variante e atualiza internamente as linhas de substituição de textura do  .blk  para 
   corresponderem ao novo veículo.                                                                                 
-                                                                                                                  
-  ### 4. 🧹 Otimizador e Compactador de Armazenamento (Storage Optimizer)                                         
-                                                                                                                
-  • Como funciona: As skins personalizadas do War Thunder costumam ser gigantescas (de 200MB a mais de 1GB por    
-  skin) devido a texturas uncompressed (normalmente ficheiros  .tga  em 4K ou 8K).                                
-  • Detalhe Técnico: Um analisador que exibe o tamanho em disco de cada skin instalada e oferece uma ferramenta   
-  para converter ficheiros  .tga  pesados em formato  .dds  compactado de alta performance, economizando gigabytes
-  no SSD.                                                                                                         
+                                                                                                                                                                                                                   
                                                                                                                  
   ### 5. 🏷️ Filtro de Conteúdo Permanente e Blacklist de Tags                                                     
                                                                                                                 

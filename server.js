@@ -978,8 +978,221 @@ app.get('/api/installed/check-updates', async (req, res) => {
       console.error(`Error checking update for post ${mod.postId}:`, err);
     }
   }
-
   res.json({ updates: results });
+});
+
+// Helper: Calculate directory statistics (Total, Source Project files, Archive files, Game textures)
+function getDirectoryStats(dirPath) {
+  let stats = {
+    totalSize: 0,
+    sourceSize: 0,
+    archiveSize: 0,
+    gameSize: 0,
+    filesCount: 0
+  };
+
+  if (!fs.existsSync(dirPath)) return stats;
+
+  const walk = (currentPath) => {
+    try {
+      const files = fs.readdirSync(currentPath);
+      for (const file of files) {
+        const fullPath = path.join(currentPath, file);
+        const fileStat = fs.statSync(fullPath);
+        if (fileStat.isDirectory()) {
+          walk(fullPath);
+        } else {
+          const size = fileStat.size;
+          stats.totalSize += size;
+          stats.filesCount += 1;
+          
+          const ext = path.extname(file).toLowerCase();
+          if (ext === '.psd' || ext === '.xcf') {
+            stats.sourceSize += size;
+          } else if (ext === '.zip' || ext === '.rar' || ext === '.7z' || ext === '.tar' || ext === '.gz') {
+            stats.archiveSize += size;
+          } else {
+            stats.gameSize += size;
+          }
+        }
+      }
+    } catch (_) {}
+  };
+
+  walk(dirPath);
+  return stats;
+}
+
+// Helper: Delete source project and archive files from directory recursively
+function cleanDirectory(dirPath) {
+  let spaceSaved = 0;
+  if (!fs.existsSync(dirPath)) return spaceSaved;
+
+  const walkAndClean = (currentPath) => {
+    try {
+      const files = fs.readdirSync(currentPath);
+      for (const file of files) {
+        const fullPath = path.join(currentPath, file);
+        const fileStat = fs.statSync(fullPath);
+        if (fileStat.isDirectory()) {
+          walkAndClean(fullPath);
+        } else {
+          const ext = path.extname(file).toLowerCase();
+          if (ext === '.psd' || ext === '.xcf' || ext === '.zip' || ext === '.rar' || ext === '.7z' || ext === '.tar' || ext === '.gz') {
+            fs.unlinkSync(fullPath);
+            spaceSaved += fileStat.size;
+          }
+        }
+      }
+    } catch (_) {}
+  };
+
+  walkAndClean(dirPath);
+  return spaceSaved;
+}
+
+// API: Analyze storage usage of all installed mods
+app.get('/api/storage/analyze', (req, res) => {
+  const settings = loadSettings();
+  const modsList = [];
+
+  const scanDir = (baseDir, type, isDisabled) => {
+    if (!fs.existsSync(baseDir)) return;
+    try {
+      const folders = fs.readdirSync(baseDir);
+      for (const folder of folders) {
+        const fullPath = path.join(baseDir, folder);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          let metadata = null;
+          const metaPath = path.join(fullPath, '.wtlive.json');
+          if (fs.existsSync(metaPath)) {
+            try {
+              metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+            } catch (_) {}
+          }
+          
+          const stats = getDirectoryStats(fullPath);
+          if (stats.totalSize > 0) {
+            modsList.push({
+              name: folder,
+              type,
+              disabled: isDisabled,
+              path: fullPath,
+              title: metadata ? metadata.title : folder,
+              stats
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  };
+
+  if (settings.wtPath) {
+    scanDir(path.join(settings.wtPath, 'UserSkins'), 'camouflage', false);
+    scanDir(path.join(settings.wtPath, 'UserSkins_disabled'), 'camouflage', true);
+  }
+  if (settings.sightsPath) {
+    scanDir(settings.sightsPath, 'sight', false);
+    scanDir(settings.sightsPath + '_disabled', 'sight', true);
+  }
+
+  let globalTotal = 0;
+  let globalSource = 0;
+  let globalArchive = 0;
+  let globalGame = 0;
+
+  modsList.forEach(m => {
+    globalTotal += m.stats.totalSize;
+    globalSource += m.stats.sourceSize;
+    globalArchive += m.stats.archiveSize;
+    globalGame += m.stats.gameSize;
+  });
+
+  modsList.sort((a, b) => b.stats.totalSize - a.stats.totalSize);
+
+  res.json({
+    mods: modsList,
+    totals: {
+      totalSize: globalTotal,
+      sourceSize: globalSource,
+      archiveSize: globalArchive,
+      gameSize: globalGame
+    }
+  });
+});
+
+// API: Perform cleanup on a single mod or all mods
+app.post('/api/storage/clean', (req, res) => {
+  const { name, type, all } = req.body;
+  const settings = loadSettings();
+  let spaceSaved = 0;
+
+  if (all) {
+    const cleanAllInDir = (baseDir) => {
+      if (!fs.existsSync(baseDir)) return;
+      try {
+        const folders = fs.readdirSync(baseDir);
+        for (const folder of folders) {
+          const fullPath = path.join(baseDir, folder);
+          if (fs.statSync(fullPath).isDirectory()) {
+            spaceSaved += cleanDirectory(fullPath);
+          }
+        }
+      } catch (_) {}
+    };
+
+    if (settings.wtPath) {
+      cleanAllInDir(path.join(settings.wtPath, 'UserSkins'));
+      cleanAllInDir(path.join(settings.wtPath, 'UserSkins_disabled'));
+    }
+    if (settings.sightsPath) {
+      cleanAllInDir(settings.sightsPath);
+      cleanAllInDir(settings.sightsPath + '_disabled');
+    }
+
+    return res.json({
+      success: true,
+      spaceSaved,
+      message: `Successfully cleaned all modifications. Saved ${(spaceSaved / 1024 / 1024).toFixed(1)} MB.`
+    });
+  }
+
+  if (!name || !type) {
+    return res.status(400).json({ error: 'Missing parameters: name, type' });
+  }
+
+  let folderPath = '';
+  let disabledFolderPath = '';
+  if (type === 'camouflage') {
+    if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
+    folderPath = path.join(settings.wtPath, 'UserSkins', name);
+    disabledFolderPath = path.join(settings.wtPath, 'UserSkins_disabled', name);
+  } else if (type === 'sight') {
+    if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
+    folderPath = path.join(settings.sightsPath, name);
+    disabledFolderPath = path.join(settings.sightsPath + '_disabled', name);
+  } else {
+    return res.status(400).json({ error: 'Invalid type' });
+  }
+
+  let targetPath = '';
+  if (fs.existsSync(folderPath)) {
+    targetPath = folderPath;
+  } else if (fs.existsSync(disabledFolderPath)) {
+    targetPath = disabledFolderPath;
+  }
+
+  if (!targetPath) {
+    return res.status(404).json({ error: 'Modification folder not found.' });
+  }
+
+  spaceSaved = cleanDirectory(targetPath);
+  res.json({
+    success: true,
+    spaceSaved,
+    message: `Cleaned "${name}". Saved ${(spaceSaved / 1024 / 1024).toFixed(1)} MB.`
+  });
 });
 
 // API: List installed skins and sights (including disabled mods in separate folders)

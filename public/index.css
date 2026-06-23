@@ -1639,3 +1639,223 @@ select:focus {
   transform: none;
 }
 
+/* Storage Modal CSS */
+.storage-card {
+  max-width: 800px !important;
+  width: 90%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color-hover);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-hover);
+  animation: modal-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes modal-enter {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.storage-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.storage-modal-header h2 {
+  font-family: var(--font-family-display);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.close-modal-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: var(--transition-fast);
+}
+
+.close-modal-btn:hover {
+  color: var(--color-error);
+}
+
+.storage-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: calc(85vh - 75px);
+}
+
+.storage-stats-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.storage-stat-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.storage-stat-box .value {
+  font-family: var(--font-family-display);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.storage-stat-box .label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.storage-stat-box.warning {
+  border-color: hsla(0, 85%, 60%, 0.2);
+}
+.storage-stat-box.warning .value {
+  color: var(--color-error);
+}
+
+.storage-stat-box.success {
+  border-color: hsla(145, 80%, 45%, 0.2);
+}
+.storage-stat-box.success .value {
+  color: var(--color-success);
+}
+
+.storage-alert {
+  background: rgba(255, 170, 0, 0.05);
+  border: 1px solid hsla(38, 100%, 52%, 0.2);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.storage-actions-row {
+  display: flex;
+  justify-content: center;
+}
+
+.storage-mods-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.storage-mods-section h3 {
+  font-family: var(--font-family-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.storage-mods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.storage-mod-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.storage-mod-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex-grow: 1;
+}
+
+.storage-mod-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.storage-mod-details {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 12px;
+}
+
+.storage-mod-details span.waste {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.storage-mod-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-clean-single {
+  background: rgba(255, 170, 0, 0.1);
+  border: 1px solid hsla(38, 100%, 52%, 0.3);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-clean-single:hover {
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  box-shadow: 0 4px 10px rgba(255, 170, 0, 0.2);
+}
+
+.btn-clean-single:disabled {
+  background: transparent;
+  border-color: var(--border-color);
+  color: var(--text-muted);
+  cursor: default;
+  box-shadow: none;
+}
+

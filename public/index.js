@@ -1394,6 +1394,10 @@ window.addModToQueueById = addModToQueueById;
 window.pollQueue = pollQueue;
 window.checkUpdates = checkUpdates;
 window.installUpdate = installUpdate;
+window.openStorageModal = openStorageModal;
+window.closeStorageModal = closeStorageModal;
+window.cleanSingleMod = cleanSingleMod;
+window.cleanAllStorage = cleanAllStorage;
 
 // ==========================================
 // DOWNLOAD QUEUE HANDLERS & RENDERING
@@ -1759,6 +1763,158 @@ async function installUpdate(update, btnElement) {
     if (btnElement) {
       btnElement.disabled = false;
       btnElement.innerText = '🔄 Update';
+    }
+  }
+}
+
+// ==========================================
+// STORAGE ANALYZER & CLEANUP METHODS
+// ==========================================
+
+// Open the storage optimizer modal and query stats
+async function openStorageModal() {
+  const modal = document.getElementById('storage-overlay');
+  modal.classList.remove('hidden');
+  
+  // Render loading state
+  document.getElementById('storage-val-total').innerText = '⏳ ...';
+  document.getElementById('storage-val-source').innerText = '⏳ ...';
+  document.getElementById('storage-val-archive').innerText = '⏳ ...';
+  document.getElementById('storage-val-game').innerText = '⏳ ...';
+  
+  const listContainer = document.getElementById('storage-mods-list-container');
+  listContainer.innerHTML = '<div class="no-downloads-msg">Analyzing local directories, please wait...</div>';
+
+  try {
+    const res = await fetch('/api/storage/analyze');
+    const data = await res.json();
+    
+    // Fill stat boxes
+    const toMB = (bytes) => (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    
+    document.getElementById('storage-val-total').innerText = toMB(data.totals.totalSize);
+    document.getElementById('storage-val-source').innerText = toMB(data.totals.sourceSize);
+    document.getElementById('storage-val-archive').innerText = toMB(data.totals.archiveSize);
+    document.getElementById('storage-val-game').innerText = toMB(data.totals.gameSize);
+    
+    // Fill list of mods
+    if (data.mods && data.mods.length > 0) {
+      listContainer.innerHTML = data.mods.map(mod => {
+        const wasteBytes = mod.stats.sourceSize + mod.stats.archiveSize;
+        const wasteMb = (wasteBytes / 1024 / 1024).toFixed(1);
+        const totalMb = (mod.stats.totalSize / 1024 / 1024).toFixed(1);
+        
+        let detailsText = `<span>Total: ${totalMb} MB (${mod.stats.filesCount} files)</span>`;
+        if (wasteBytes > 0) {
+          detailsText += ` • <span class="waste">Source & Backups: ${wasteMb} MB</span>`;
+        }
+
+        const isCleanable = wasteBytes > 0;
+        
+        return `
+          <div class="storage-mod-row">
+            <div class="storage-mod-info">
+              <span class="storage-mod-title" title="${mod.title}">${mod.title} ${mod.disabled ? '(Disabled)' : ''}</span>
+              <div class="storage-mod-details">
+                ${detailsText}
+              </div>
+            </div>
+            <div class="storage-mod-actions">
+              <button class="btn-clean-single" 
+                      onclick="cleanSingleMod('${mod.name}', '${mod.type}', this)" 
+                      ${!isCleanable ? 'disabled' : ''}>
+                🧹 Clean
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      listContainer.innerHTML = '<div class="no-downloads-msg">No custom modifications found to analyze.</div>';
+    }
+  } catch (e) {
+    showToast('Failed to analyze storage usage.', 'error');
+    listContainer.innerHTML = '<div class="no-downloads-msg" style="color: var(--color-error)">Failed to complete storage analysis.</div>';
+  }
+}
+
+// Close the storage optimizer modal
+function closeStorageModal() {
+  document.getElementById('storage-overlay').classList.add('hidden');
+}
+
+// Clean source and archive files inside a single mod folder
+async function cleanSingleMod(name, type, btnElement) {
+  if (btnElement) {
+    btnElement.disabled = true;
+    btnElement.innerText = '⏳ ...';
+  }
+
+  try {
+    const res = await fetch('/api/storage/clean', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, type })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message, 'success');
+      // Refresh statistics inside the modal
+      openStorageModal();
+      // Reload installed list in the background
+      loadLibrary();
+    } else {
+      showToast(data.error || 'Failed to clean modification.', 'error');
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.innerText = '🧹 Clean';
+      }
+    }
+  } catch (e) {
+    showToast('Connection error during cleanup.', 'error');
+    if (btnElement) {
+      btnElement.disabled = false;
+      btnElement.innerText = '🧹 Clean';
+    }
+  }
+}
+
+// Clean source and archive files for ALL installed mods
+async function cleanAllStorage(btnElement) {
+  if (!confirm('Are you sure you want to clean all project source files (.psd, .xcf) and archives (.zip, .rar) from ALL your custom mods? This is 100% safe and will keep skins/sights working in game, but will permanently delete these project files.')) {
+    return;
+  }
+
+  if (btnElement) {
+    btnElement.disabled = true;
+    btnElement.innerText = '⏳ Cleaning All Mods...';
+  }
+
+  try {
+    const res = await fetch('/api/storage/clean', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message, 'success');
+      openStorageModal();
+      loadLibrary();
+    } else {
+      showToast(data.error || 'Failed to complete clean execution.', 'error');
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.innerText = '🧹 Clean All Source & Archive Files';
+      }
+    }
+  } catch (e) {
+    showToast('Connection error during global clean execution.', 'error');
+    if (btnElement) {
+      btnElement.disabled = false;
+      btnElement.innerText = '🧹 Clean All Source & Archive Files';
     }
   }
 }

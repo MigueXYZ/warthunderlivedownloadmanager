@@ -160,6 +160,7 @@
         <div class="library-header">
           <h2>Installed Modifications</h2>
           <div style="display: flex; gap: 12px;">
+            <button class="btn-secondary" id="btn-analyze-storage" onclick="openStorageModal()">🧹 Analyze Storage</button>
             <button class="btn-secondary" id="btn-check-updates" onclick="checkUpdates(this)">🔄 Check Updates</button>
             <button class="btn-secondary" onclick="loadLibrary()">🔄 Refresh Library</button>
           </div>
@@ -258,6 +259,55 @@
       <span class="zoom-value" id="lightbox-zoom-val">100%</span>
       <button class="control-icon-btn" onclick="zoomLightbox(-0.2, event)">➖ Zoom Out</button>
       <button class="control-icon-btn" onclick="resetLightboxZoom(event)">🔄 Reset</button>
+    </div>
+  </div>
+
+  <!-- Storage Analyzer Modal -->
+  <div class="overlay hidden" id="storage-overlay">
+    <div class="overlay-card storage-card">
+      <div class="storage-modal-header">
+        <h2>🧹 Storage Analyzer & Clean</h2>
+        <button class="close-modal-btn" onclick="closeStorageModal()">&times;</button>
+      </div>
+      <div class="storage-modal-body">
+        <!-- Total Stats section -->
+        <div class="storage-stats-container">
+          <div class="storage-stat-box">
+            <span class="value" id="storage-val-total">0.0 MB</span>
+            <span class="label">Total Size</span>
+          </div>
+          <div class="storage-stat-box warning">
+            <span class="value" id="storage-val-source">0.0 MB</span>
+            <span class="label">Source Projects (.psd, .xcf)</span>
+          </div>
+          <div class="storage-stat-box warning">
+            <span class="value" id="storage-val-archive">0.0 MB</span>
+            <span class="label">Archive Backups (.zip, .rar)</span>
+          </div>
+          <div class="storage-stat-box success">
+            <span class="value" id="storage-val-game">0.0 MB</span>
+            <span class="label">Active Game Files</span>
+          </div>
+        </div>
+
+        <!-- Info alert box -->
+        <div class="storage-alert">
+          💡 <strong>Pro-Tip:</strong> Custom skin creators often leave Photoshop files (.psd) or backup archives (.zip) inside their directories. These files are <strong>ignored by the game</strong> but consume gigabytes of disk space. Cleaning them is 100% safe!
+        </div>
+
+        <!-- Actions row -->
+        <div class="storage-actions-row">
+          <button class="btn-primary" id="btn-clean-all-storage" onclick="cleanAllStorage(this)">🧹 Clean All Source & Archive Files</button>
+        </div>
+
+        <!-- List of modifications -->
+        <div class="storage-mods-section">
+          <h3>Modifications by Disk Space</h3>
+          <div class="storage-mods-list" id="storage-mods-list-container">
+            <!-- Dynamically populated list -->
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
