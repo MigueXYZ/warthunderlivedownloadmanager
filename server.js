@@ -1279,9 +1279,11 @@ app.get('/api/installed', (req, res) => {
                 metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
               } catch (_) {}
             }
-            let hasBlk = false;
+            let blkFiles = [];
             try {
-              hasBlk = fs.readdirSync(fullPath).some(f => f.toLowerCase().endsWith('.blk'));
+              blkFiles = fs.readdirSync(fullPath)
+                .filter(f => f.toLowerCase().endsWith('.blk'))
+                .map(f => f.toLowerCase());
             } catch (_) {}
 
             installedSkins.push({
@@ -1289,7 +1291,8 @@ app.get('/api/installed', (req, res) => {
               disabled: isDisabled,
               path: fullPath,
               installedAt: stat.mtimeMs || stat.mtime.getTime(),
-              hasBlk,
+              hasBlk: blkFiles.length > 0,
+              blkFiles,
               metadata
             });
           }

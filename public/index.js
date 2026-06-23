@@ -71,6 +71,9 @@ const elements = {
   telemetryContent: document.getElementById('telemetry-content'),
   activeVehicleName: document.getElementById('active-vehicle-name'),
   btnAutoSearch: document.getElementById('btn-auto-search'),
+  telemetrySkinsAlert: document.getElementById('telemetry-skins-alert'),
+  telemetrySkinsAlertText: document.getElementById('telemetry-skins-alert-text'),
+  linkViewMatchingSkins: document.getElementById('link-view-matching-skins'),
   
   installOverlay: document.getElementById('install-overlay'),
   overlayTitle: document.getElementById('overlay-title'),
@@ -222,6 +225,16 @@ function setupEventListeners() {
     if (state.lightbox && state.lightbox.isDragging) {
       state.lightbox.isDragging = false;
       elements.lightboxImg.style.cursor = 'grab';
+    }
+  });
+
+  elements.linkViewMatchingSkins.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (state.activeVehicle) {
+      switchTab('library');
+      // Set the search input value to match the display name of the vehicle
+      elements.librarySearchInput.value = formatVehicleDisplayName(state.activeVehicle);
+      filterLibrary();
     }
   });
 }
@@ -953,6 +966,10 @@ function renderLibraryLists() {
 
       const card = document.createElement('div');
       card.className = `lib-card ${skin.disabled ? 'disabled' : ''}`;
+      card.setAttribute('data-name', skin.name.toLowerCase());
+      if (skin.blkFiles) {
+        card.setAttribute('data-blkfiles', JSON.stringify(skin.blkFiles));
+      }
       card.innerHTML = `
         <div class="lib-card-media" onclick="openFullscreenImage(this.querySelector('img').src, [this.querySelector('img').src], 0, event)">
           <img src="${imageUrl}" alt="${displayTitle}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=No+Preview'">
@@ -1066,13 +1083,43 @@ function filterLibrary() {
   const inputEl = document.getElementById('library-search-input');
   if (!inputEl) return;
   const query = inputEl.value.toLowerCase().trim();
+  const cleanQuery = query.replace(/[\s\-_]+/g, '');
   
   // Filter skins
   const skinCards = elements.skinsList.querySelectorAll('.lib-card');
   skinCards.forEach(card => {
     const title = card.querySelector('.lib-card-title').textContent.toLowerCase();
     const meta = card.querySelector('.lib-card-meta').textContent.toLowerCase();
-    if (title.includes(query) || meta.includes(query)) {
+    
+    let matches = false;
+    if (query) {
+      matches = title.includes(query) || meta.includes(query);
+      
+      if (!matches) {
+        const cardName = card.getAttribute('data-name') || '';
+        const cleanCardName = cardName.replace(/[\s\-_]+/g, '');
+        if (cleanCardName.includes(cleanQuery) || cleanQuery.includes(cleanCardName)) {
+          matches = true;
+        }
+      }
+      
+      if (!matches) {
+        try {
+          const blkFilesAttr = card.getAttribute('data-blkfiles');
+          if (blkFilesAttr) {
+            const blkFiles = JSON.parse(blkFilesAttr);
+            matches = blkFiles.some(blk => {
+              const cleanBlk = blk.toLowerCase().replace(/\.blk$/, '').replace(/[\s\-_]+/g, '');
+              return cleanBlk.includes(cleanQuery) || cleanQuery.includes(cleanBlk);
+            });
+          }
+        } catch (_) {}
+      }
+    } else {
+      matches = true;
+    }
+    
+    if (matches) {
       card.style.display = 'flex';
     } else {
       card.style.display = 'none';
@@ -1084,7 +1131,15 @@ function filterLibrary() {
   sightCards.forEach(card => {
     const title = card.querySelector('.lib-card-title').textContent.toLowerCase();
     const meta = card.querySelector('.lib-card-meta').textContent.toLowerCase();
-    if (title.includes(query) || meta.includes(query)) {
+    
+    let matches = false;
+    if (query) {
+      matches = title.includes(query) || meta.includes(query);
+    } else {
+      matches = true;
+    }
+    
+    if (matches) {
       card.style.display = 'flex';
     } else {
       card.style.display = 'none';
@@ -1171,6 +1226,25 @@ function cleanTelemetryVehicleName(rawName) {
   return cleaned;
 }
 
+// Helper to check if an installed skin matches a vehicle name
+function doesSkinMatchVehicle(skin, vehicleName) {
+  if (!vehicleName) return false;
+  const vClean = vehicleName.toLowerCase().replace(/[\s\-_]+/g, '');
+  
+  // Check blk files
+  if (skin.blkFiles && skin.blkFiles.length > 0) {
+    const matchesBlk = skin.blkFiles.some(blk => {
+      const bClean = blk.toLowerCase().replace(/\.blk$/, '').replace(/[\s\-_]+/g, '');
+      return bClean.includes(vClean) || vClean.includes(bClean);
+    });
+    if (matchesBlk) return true;
+  }
+  
+  // Check folder name as fallback
+  const folderClean = skin.name.toLowerCase().replace(/[\s\-_]+/g, '');
+  return folderClean.includes(vClean) || vClean.includes(folderClean);
+}
+
 // API: Poll game telemetry
 async function pollTelemetry() {
   try {
@@ -1187,6 +1261,18 @@ async function pollTelemetry() {
       elements.activeVehicleName.innerText = formatVehicleDisplayName(cleanedVehicle);
       elements.telemetryContent.classList.remove('hidden');
       document.getElementById('telemetry-footer-text').innerText = 'In-match tracking active';
+
+      // Check for matching skins in state.installedList.skins
+      const matchingSkins = (state.installedList.skins || []).filter(skin => 
+        doesSkinMatchVehicle(skin, cleanedVehicle)
+      );
+
+      if (matchingSkins.length > 0) {
+        elements.telemetrySkinsAlertText.innerText = `You have ${matchingSkins.length} skin(s) installed for this vehicle.`;
+        elements.telemetrySkinsAlert.classList.remove('hidden');
+      } else {
+        elements.telemetrySkinsAlert.classList.add('hidden');
+      }
     } else {
       state.telemetryActive = false;
       state.activeVehicle = '';
@@ -1195,6 +1281,7 @@ async function pollTelemetry() {
       elements.telemetryStatus.innerText = 'WT Client Offline';
       elements.telemetryContent.classList.add('hidden');
       document.getElementById('telemetry-footer-text').innerText = 'Launch WT & enter test flight/match';
+      elements.telemetrySkinsAlert.classList.add('hidden');
     }
   } catch (e) {
     // Silently ignore telemetry polling errors

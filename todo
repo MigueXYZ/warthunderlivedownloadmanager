@@ -5,10 +5,4 @@
   mas o utilizador quer usá-la no  leopard_2a5  ou no sueco  strv_122a .                                          
   • Detalhe Técnico: Um utilitário que copia a pasta da skin escolhida, duplica e renomeia o ficheiro  .blk       
   correspondente para a nova variante e atualiza internamente as linhas de substituição de textura do  .blk  para 
-  corresponderem ao novo veículo.                                                                                 
-                                                                                                                                                                                                                   
-  ### 6. 🔔 Alerta de Skin Disponível em Jogo (In-Game Telemetry Companion Overlay)                               
-                                                                                                                  
-  • Como funciona: Quando o companheiro de telemetria (index.js) deteta que o jogador entrou numa partida ou
-  voo de teste com um veículo específico, a aplicação envia uma notificação desktop no Windows (ou destaca na UI):
-  │ 💡 Você entrou em combate com o Leopard 2A6! Tem 3 camuflagens instaladas para este veículo
+  corresponderem ao novo veículo. 

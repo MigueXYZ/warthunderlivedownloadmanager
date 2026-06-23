@@ -44,6 +44,13 @@
           <p class="label">ACTIVE VEHICLE</p>
           <h3 id="active-vehicle-name">Leopard 2A6</h3>
           <button class="action-btn" id="btn-auto-search">🔍 Find Skins & Sights</button>
+          
+          <!-- Skins alert -->
+          <div class="telemetry-skins-alert hidden" id="telemetry-skins-alert" style="margin-top: 12px; background: rgba(255, 170, 0, 0.08); border: 1px solid hsla(38, 100%, 52%, 0.25); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; text-align: left; animation: pulse-glow 2s infinite alternate;">
+            <span style="color: var(--accent-primary); font-weight: 700;">💡 Skins Installed!</span>
+            <span id="telemetry-skins-alert-text" style="color: var(--text-main);">You have custom skins.</span>
+            <a href="#" id="link-view-matching-skins" style="color: var(--accent-secondary); font-weight: 600; text-decoration: underline; margin-top: 2px;">View in Library</a>
+          </div>
         </div>
         <div class="telemetry-footer" id="telemetry-footer-text">
           Launch WT & enter test flight/match
