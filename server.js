@@ -339,7 +339,7 @@ let currentActiveDownload = null;
 let downloadHistory = [];
 let isProcessingQueue = false;
 
-// Helper function to download file from URL with support for AbortSignal and progress reporting
+// Helper function to download file from URL with support for AbortSignal, HTTP Range resume, and progress reporting
 async function downloadFileWithSignal(url, destPath, cookie, signal, onProgress) {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -349,16 +349,50 @@ async function downloadFileWithSignal(url, destPath, cookie, signal, onProgress)
     headers['Cookie'] = `token=${cookie}`;
   }
 
+  let downloadedBytes = 0;
+  if (fs.existsSync(destPath)) {
+    try {
+      downloadedBytes = fs.statSync(destPath).size;
+    } catch (_) {}
+  }
+
+  if (downloadedBytes > 0) {
+    headers['Range'] = `bytes=${downloadedBytes}-`;
+  }
+
   const response = await fetch(url, { headers, signal });
 
-  if (!response.ok) {
+  let isResuming = response.status === 206;
+  if (response.status === 416 || (downloadedBytes > 0 && response.status === 200)) {
+    isResuming = false;
+    downloadedBytes = 0;
+    try {
+      if (fs.existsSync(destPath)) {
+        fs.unlinkSync(destPath);
+      }
+    } catch (_) {}
+  } else if (!response.ok) {
     throw new Error(`Failed to download file: ${response.statusText} (${response.status})`);
   }
 
-  const totalBytes = parseInt(response.headers.get('content-length'), 10) || 0;
-  let downloadedBytes = 0;
+  let totalBytes = 0;
+  if (isResuming) {
+    const contentRange = response.headers.get('content-range');
+    if (contentRange) {
+      const match = contentRange.match(/\/(\d+)$/);
+      if (match) {
+        totalBytes = parseInt(match[1], 10);
+      }
+    }
+    if (!totalBytes) {
+      const remainingBytes = parseInt(response.headers.get('content-length'), 10) || 0;
+      totalBytes = remainingBytes + downloadedBytes;
+    }
+  } else {
+    totalBytes = parseInt(response.headers.get('content-length'), 10) || 0;
+  }
 
-  const fileStream = fs.createWriteStream(destPath);
+  const fileStream = fs.createWriteStream(destPath, isResuming ? { flags: 'a' } : undefined);
   const reader = response.body.getReader();
 
   try {
@@ -582,11 +616,15 @@ async function processQueue() {
 
     } catch (err) {
       if (fs.existsSync(tempZipPath)) {
-        try { fs.unlinkSync(tempZipPath); } catch (_) {}
+        if (item.status !== 'paused') {
+          try { fs.unlinkSync(tempZipPath); } catch (_) {}
+        }
       }
 
       if (item.status === 'cancelled') {
         console.log(`[Queue] Cancelled: ${item.title}`);
+      } else if (item.status === 'paused') {
+        console.log(`[Queue] Paused: ${item.title}`);
       } else {
         item.status = 'failed';
         item.error = err.message;
@@ -596,13 +634,15 @@ async function processQueue() {
     } finally {
       delete item.abortController;
       
-      const idx = downloadQueue.findIndex(x => x.id === item.id);
-      if (idx !== -1) {
-        downloadQueue.splice(idx, 1);
-      }
-      downloadHistory.unshift(item);
-      if (downloadHistory.length > 50) {
-        downloadHistory.pop();
+      if (item.status !== 'paused') {
+        const idx = downloadQueue.findIndex(x => x.id === item.id);
+        if (idx !== -1) {
+          downloadQueue.splice(idx, 1);
+        }
+        downloadHistory.unshift(item);
+        if (downloadHistory.length > 50) {
+          downloadHistory.pop();
+        }
       }
       
       currentActiveDownload = null;
@@ -974,6 +1014,19 @@ app.post('/api/queue/cancel', (req, res) => {
     removed.status = 'cancelled';
     removed.completedAt = Date.now();
     downloadHistory.unshift(removed);
+
+    // Clean up partial file in temp folder if any
+    const tempDir = path.join(__dirname, 'temp');
+    const safeName = removed.name.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+    const tempZipPath = path.join(tempDir, safeName);
+    if (fs.existsSync(tempZipPath)) {
+      try {
+        fs.unlinkSync(tempZipPath);
+      } catch (err) {
+        console.error('Error cleaning up temp file on cancel:', err);
+      }
+    }
+
     return res.json({ success: true, message: 'Pending download cancelled.' });
   }
 
@@ -1037,6 +1090,59 @@ app.post('/api/queue/reorder', (req, res) => {
   });
   
   res.json({ success: true, queue: cleanQueue });
+});
+
+// API: Pause active or queued download
+app.post('/api/queue/pause', (req, res) => {
+  const { id } = req.body;
+  if (!id) {
+    return res.status(400).json({ error: 'Missing parameter: id' });
+  }
+
+  if (currentActiveDownload && currentActiveDownload.id === id) {
+    currentActiveDownload.status = 'paused';
+    if (currentActiveDownload.abortController) {
+      try {
+        currentActiveDownload.abortController.abort();
+      } catch (e) {
+        console.error('Error aborting active download for pause:', e);
+      }
+    }
+    return res.json({ success: true, message: 'Active download pause triggered.' });
+  }
+
+  const index = downloadQueue.findIndex(x => x.id === id);
+  if (index !== -1) {
+    const item = downloadQueue[index];
+    item.status = 'paused';
+    return res.json({ success: true, message: 'Pending download paused.' });
+  }
+
+  res.status(404).json({ error: 'Download item not found in active or queued downloads.' });
+});
+
+// API: Resume paused download
+app.post('/api/queue/resume', (req, res) => {
+  const { id } = req.body;
+  if (!id) {
+    return res.status(400).json({ error: 'Missing parameter: id' });
+  }
+
+  const index = downloadQueue.findIndex(x => x.id === id);
+  if (index !== -1) {
+    const item = downloadQueue[index];
+    if (item.status !== 'paused') {
+      return res.status(400).json({ error: 'Download is not paused.' });
+    }
+    item.status = 'pending';
+    
+    // Kickoff the queue processor
+    processQueue();
+
+    return res.json({ success: true, message: 'Download resumed.' });
+  }
+
+  res.status(404).json({ error: 'Download item not found in queue.' });
 });
 
 // API: Check updates for installed modifications

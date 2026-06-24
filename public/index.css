@@ -1518,6 +1518,10 @@ select:focus {
   color: var(--color-error);
 }
 
+.download-status-text.paused {
+  color: var(--color-warning);
+}
+
 .download-status-text.cancelled {
   color: var(--text-muted);
   text-decoration: line-through;
@@ -1546,6 +1550,42 @@ select:focus {
   background: rgba(255, 0, 0, 0.1);
   border-color: var(--color-error);
   color: var(--color-error);
+}
+
+.btn-pause-dl {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-pause-dl:hover {
+  background: rgba(255, 170, 0, 0.1);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.btn-resume-dl {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-resume-dl:hover {
+  background: rgba(46, 204, 113, 0.1);
+  border-color: var(--color-success);
+  color: var(--color-success);
 }
 
 .btn-order-dl {

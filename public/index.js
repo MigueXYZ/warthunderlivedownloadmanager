@@ -1586,6 +1586,8 @@ window.cleanAllStorage = cleanAllStorage;
 window.openCookieModal = openCookieModal;
 window.closeCookieModal = closeCookieModal;
 window.copyCookieSnippet = copyCookieSnippet;
+window.pauseDownload = pauseDownload;
+window.resumeDownload = resumeDownload;
 
 // ==========================================
 // DOWNLOAD QUEUE HANDLERS & RENDERING
@@ -1674,6 +1676,46 @@ async function cancelDownload(id) {
   }
 }
 
+// Pause a queued or active download
+async function pauseDownload(id) {
+  try {
+    const res = await fetch('/api/queue/pause', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Download paused.', 'success');
+      pollQueue();
+    } else {
+      showToast(data.error || 'Failed to pause download.', 'error');
+    }
+  } catch (e) {
+    showToast('Failed to pause download.', 'error');
+  }
+}
+
+// Resume a paused download
+async function resumeDownload(id) {
+  try {
+    const res = await fetch('/api/queue/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Download resumed.', 'success');
+      pollQueue();
+    } else {
+      showToast(data.error || 'Failed to resume download.', 'error');
+    }
+  } catch (e) {
+    showToast('Failed to resume download.', 'error');
+  }
+}
+
 // Reorder queue item
 async function reorderQueue(id, action) {
   try {
@@ -1748,6 +1790,7 @@ function renderQueueLists() {
           </div>
         </div>
         <div class="download-actions">
+          <button class="btn-pause-dl" onclick="pauseDownload('${active.id}')">Pause</button>
           <button class="btn-cancel-dl" onclick="cancelDownload('${active.id}')">Cancel</button>
         </div>
       </div>
@@ -1763,12 +1806,32 @@ function renderQueueLists() {
       const cleanTitle = item.title || item.name;
       const authorName = item.author ? item.author.nickname : 'Anonymous';
       
+      const isPaused = item.status === 'paused';
+      const statusClass = isPaused ? 'paused' : 'pending';
+      const statusText = isPaused ? 'Paused' : `Queued (Position #${idx + 1})`;
+      
       const isFirst = idx === 0;
       const isLast = idx === queue.length - 1;
       
       const upDisabled = isFirst ? 'disabled title="Already at the top"' : 'title="Move Up"';
       const downDisabled = isLast ? 'disabled title="Already at the bottom"' : 'title="Move Down"';
       const topDisabled = isFirst ? 'disabled title="Already at the top"' : 'title="Move to Top"';
+      
+      let actionButtons = '';
+      if (isPaused) {
+        actionButtons = `
+          <button class="btn-resume-dl" onclick="resumeDownload('${item.id}')" title="Resume download">Resume</button>
+          <button class="btn-cancel-dl" onclick="cancelDownload('${item.id}')" title="Remove from queue">✕</button>
+        `;
+      } else {
+        actionButtons = `
+          <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'top')" ${topDisabled}>⇈</button>
+          <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'up')" ${upDisabled}>↑</button>
+          <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'down')" ${downDisabled}>↓</button>
+          <button class="btn-pause-dl" onclick="pauseDownload('${item.id}')" title="Pause download" style="padding: 6px 10px;">⏸</button>
+          <button class="btn-cancel-dl" onclick="cancelDownload('${item.id}')" title="Remove from queue">✕</button>
+        `;
+      }
       
       return `
         <div class="download-card" style="margin-bottom: 8px;">
@@ -1780,14 +1843,11 @@ function renderQueueLists() {
             </div>
             <div class="download-meta">By <span>${authorName}</span></div>
             <div class="download-status-container">
-              <span class="download-status-text pending">Queued (Position #${idx + 1})</span>
+              <span class="download-status-text ${statusClass}">${statusText}</span>
             </div>
           </div>
           <div class="download-actions" style="display: flex; gap: 4px; align-items: center;">
-            <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'top')" ${topDisabled}>⇈</button>
-            <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'up')" ${upDisabled}>↑</button>
-            <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'down')" ${downDisabled}>↓</button>
-            <button class="btn-cancel-dl" onclick="cancelDownload('${item.id}')" title="Remove from queue">✕</button>
+            ${actionButtons}
           </div>
         </div>
       `;
