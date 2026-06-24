@@ -1,8 +1,15 @@
-                                                                                                    
-  ### 3. 🎨 Clonagem de Skins para Outras Variantes (Vehicle Variant Skin Cloner)                                 
-                                                                                                              
-  • Como funciona: Muitos criadores fazem skins excelentes para um tanque/avião específico (ex:  leopard_2a6 ),   
-  mas o utilizador quer usá-la no  leopard_2a5  ou no sueco  strv_122a .                                          
-  • Detalhe Técnico: Um utilitário que copia a pasta da skin escolhida, duplica e renomeia o ficheiro  .blk       
-  correspondente para a nova variante e atualiza internamente as linhas de substituição de textura do  .blk  para 
-  corresponderem ao novo veículo. 
+- Download queue with priority ordering
+- Pause / resume downloads individually
+- Automatic retry on failed downloads
+- Bandwidth limit per download and global cap
+- Clear progress and status indicators for each item
+- Integration with War Thunder live update metadata
+- Notification on completion or errors
+- Configurable download folder and temp storage
+- Automatic cleanup of partial files on cancel
+- Ability to import/export download lists
+- Logging of download activity and errors
+- Option to verify downloaded files against checksums
+- UI for filtering and sorting downloads by status
+- Support for background operation when app is minimized
+- Update checker for the manager itself
