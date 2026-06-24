@@ -420,14 +420,28 @@ async function processQueue() {
   isProcessingQueue = true;
 
   while (downloadQueue.length > 0) {
-    const itemIndex = downloadQueue.findIndex(x => x.status === 'pending');
-    if (itemIndex === -1) break;
+    const now = Date.now();
+    const pendingItems = downloadQueue.filter(x => x.status === 'pending');
+    const readyIndex = pendingItems.findIndex(x => !x.retryAfter || x.retryAfter <= now);
+    
+    if (readyIndex === -1) {
+      const waitingItems = pendingItems.filter(x => x.retryAfter && x.retryAfter > now);
+      if (waitingItems.length > 0) {
+        const nextRetryTime = Math.min(...waitingItems.map(x => x.retryAfter));
+        const delay = nextRetryTime - now;
+        setTimeout(() => {
+          processQueue();
+        }, delay);
+      }
+      break;
+    }
 
-    const item = downloadQueue[itemIndex];
+    const item = pendingItems[readyIndex];
+    const itemIndex = downloadQueue.findIndex(x => x.id === item.id);
     currentActiveDownload = item;
     
     item.status = 'downloading';
-    item.progress = 0;
+    item.progress = item.progress || 0;
     
     const settings = loadSettings();
     const tempDir = path.join(__dirname, 'temp');
@@ -615,26 +629,39 @@ async function processQueue() {
       console.log(`[Queue] Completed installation for: ${item.title}`);
 
     } catch (err) {
-      if (fs.existsSync(tempZipPath)) {
-        if (item.status !== 'paused') {
-          try { fs.unlinkSync(tempZipPath); } catch (_) {}
-        }
-      }
-
-      if (item.status === 'cancelled') {
-        console.log(`[Queue] Cancelled: ${item.title}`);
-      } else if (item.status === 'paused') {
-        console.log(`[Queue] Paused: ${item.title}`);
+      const isRetryable = item.status !== 'cancelled' && item.status !== 'paused';
+      
+      if (isRetryable && (item.retries || 0) < (item.maxRetries || 3)) {
+        item.retries = (item.retries || 0) + 1;
+        const backoffDelay = Math.pow(2, item.retries) * 1000;
+        item.retryAfter = Date.now() + backoffDelay;
+        item.status = 'pending';
+        console.log(`[Queue] Download failed for "${item.title}". Retrying in ${backoffDelay}ms (Attempt ${item.retries}/${item.maxRetries}). Error: ${err.message}`);
       } else {
-        item.status = 'failed';
-        item.error = err.message;
-        console.error(`[Queue] Failed installation for: ${item.title}`, err);
+        if (fs.existsSync(tempZipPath)) {
+          if (item.status !== 'paused') {
+            try { fs.unlinkSync(tempZipPath); } catch (_) {}
+          }
+        }
+
+        if (item.status === 'cancelled') {
+          console.log(`[Queue] Cancelled: ${item.title}`);
+        } else if (item.status === 'paused') {
+          console.log(`[Queue] Paused: ${item.title}`);
+        } else {
+          item.status = 'failed';
+          item.error = err.message;
+          console.error(`[Queue] Failed installation for: ${item.title} after maximum retries.`, err);
+        }
+        item.completedAt = Date.now();
       }
-      item.completedAt = Date.now();
     } finally {
       delete item.abortController;
       
-      if (item.status !== 'paused') {
+      const isRetrying = item.status === 'pending';
+      const isPaused = item.status === 'paused';
+      
+      if (!isRetrying && !isPaused) {
         const idx = downloadQueue.findIndex(x => x.id === item.id);
         if (idx !== -1) {
           downloadQueue.splice(idx, 1);
@@ -980,7 +1007,10 @@ app.post('/api/queue/add', (req, res) => {
     status: 'pending',
     progress: 0,
     error: null,
-    addedAt: Date.now()
+    addedAt: Date.now(),
+    retries: 0,
+    maxRetries: 3,
+    retryAfter: null
   };
 
   downloadQueue.push(newItem);
@@ -1135,6 +1165,8 @@ app.post('/api/queue/resume', (req, res) => {
       return res.status(400).json({ error: 'Download is not paused.' });
     }
     item.status = 'pending';
+    item.retries = 0;
+    item.retryAfter = null;
     
     // Kickoff the queue processor
     processQueue();

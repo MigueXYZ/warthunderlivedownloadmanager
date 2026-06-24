@@ -1,6 +1,6 @@
 - [x] Download queue with priority ordering
 - [x] Pause / resume downloads individually
-- Automatic retry on failed downloads
+- [x] Automatic retry on failed downloads
 - Bandwidth limit per download and global cap
 - Clear progress and status indicators for each item
 - Integration with War Thunder live update metadata

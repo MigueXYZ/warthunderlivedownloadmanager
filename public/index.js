@@ -1808,7 +1808,10 @@ function renderQueueLists() {
       
       const isPaused = item.status === 'paused';
       const statusClass = isPaused ? 'paused' : 'pending';
-      const statusText = isPaused ? 'Paused' : `Queued (Position #${idx + 1})`;
+      let statusText = isPaused ? 'Paused' : `Queued (Position #${idx + 1})`;
+      if (!isPaused && item.retries > 0) {
+        statusText = `⏳ Retrying (Attempt ${item.retries}/3)...`;
+      }
       
       const isFirst = idx === 0;
       const isLast = idx === queue.length - 1;
