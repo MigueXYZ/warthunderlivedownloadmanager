@@ -3,5 +3,7 @@
   "sightsPath": "C:\\Users\\Xylo\\Documents\\My Games\\WarThunder\\Saves\\87370989\\production\\UserSights",
   "cookie": "KuZioxVAKISm93NhllovV2U0aH6Ip5XcPv7OmwgYLZObe4aj6kV9XVdBmXDHyvKW",
   "blacklistTags": "",
-  "whitelistTags": ""
+  "whitelistTags": "",
+  "limitPerDownload": 0,
+  "limitGlobal": 0
 }

@@ -18,7 +18,7 @@ const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 
 // Helper to load settings
 function loadSettings() {
-  let settings = { wtPath: '', sightsPath: '', cookie: '', blacklistTags: '', whitelistTags: '' };
+  let settings = { wtPath: '', sightsPath: '', cookie: '', blacklistTags: '', whitelistTags: '', limitPerDownload: 0, limitGlobal: 0 };
   if (fs.existsSync(SETTINGS_FILE)) {
     try {
       settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
@@ -168,6 +168,8 @@ app.get('/api/settings', async (req, res) => {
     cookie: settings.cookie || '',
     blacklistTags: settings.blacklistTags || '',
     whitelistTags: settings.whitelistTags || '',
+    limitPerDownload: settings.limitPerDownload || 0,
+    limitGlobal: settings.limitGlobal || 0,
     detectedWT: autoDetectWTPath(),
     detectedSights: autoDetectUserSightsPath(),
     isWTValid: settings.wtPath ? fs.existsSync(settings.wtPath) : false,
@@ -179,12 +181,14 @@ app.get('/api/settings', async (req, res) => {
 
 // API: Update settings
 app.post('/api/settings', (req, res) => {
-  const { wtPath, sightsPath, cookie, blacklistTags, whitelistTags } = req.body;
+  const { wtPath, sightsPath, cookie, blacklistTags, whitelistTags, limitPerDownload, limitGlobal } = req.body;
   const cleanWT = wtPath ? wtPath.trim() : '';
   const cleanSights = sightsPath ? sightsPath.trim() : '';
   const cleanCookie = cookie ? cookie.trim() : '';
   const cleanBlacklist = blacklistTags ? blacklistTags.trim() : '';
   const cleanWhitelist = whitelistTags ? whitelistTags.trim() : '';
+  const dlLimit = parseInt(limitPerDownload, 10) || 0;
+  const gLimit = parseInt(limitGlobal, 10) || 0;
 
   if (cleanWT && !fs.existsSync(cleanWT)) {
     return res.status(400).json({ error: 'War Thunder game folder path does not exist.' });
@@ -205,7 +209,9 @@ app.post('/api/settings', (req, res) => {
     sightsPath: cleanSights, 
     cookie: cleanCookie,
     blacklistTags: cleanBlacklist,
-    whitelistTags: cleanWhitelist
+    whitelistTags: cleanWhitelist,
+    limitPerDownload: dlLimit,
+    limitGlobal: gLimit
   };
   saveSettings(settings);
   ensureSubdirsExist(cleanWT, cleanSights);
@@ -392,6 +398,20 @@ async function downloadFileWithSignal(url, destPath, cookie, signal, onProgress)
     totalBytes = parseInt(response.headers.get('content-length'), 10) || 0;
   }
 
+  const settings = loadSettings();
+  let limitBytesPerSecond = Infinity;
+  const dlLimit = parseInt(settings.limitPerDownload, 10) || 0;
+  const gLimit = parseInt(settings.limitGlobal, 10) || 0;
+  if (dlLimit > 0) {
+    limitBytesPerSecond = Math.min(limitBytesPerSecond, dlLimit * 1024);
+  }
+  if (gLimit > 0) {
+    limitBytesPerSecond = Math.min(limitBytesPerSecond, gLimit * 1024);
+  }
+
+  const sessionStartTime = Date.now();
+  let bytesDownloadedThisSession = 0;
+
   const fileStream = fs.createWriteStream(destPath, isResuming ? { flags: 'a' } : undefined);
   const reader = response.body.getReader();
 
@@ -404,9 +424,23 @@ async function downloadFileWithSignal(url, destPath, cookie, signal, onProgress)
       if (done) break;
       fileStream.write(Buffer.from(value));
       downloadedBytes += value.length;
+      bytesDownloadedThisSession += value.length;
+
       if (totalBytes && onProgress) {
         const pct = Math.round((downloadedBytes / totalBytes) * 100);
         onProgress(pct);
+      }
+
+      if (limitBytesPerSecond < Infinity) {
+        const elapsedMs = Date.now() - sessionStartTime;
+        const allowedBytes = (elapsedMs / 1000) * limitBytesPerSecond;
+        if (bytesDownloadedThisSession > allowedBytes) {
+          const targetElapsedMs = (bytesDownloadedThisSession / limitBytesPerSecond) * 1000;
+          const sleepMs = targetElapsedMs - elapsedMs;
+          if (sleepMs > 0) {
+            await new Promise(r => setTimeout(r, sleepMs));
+          }
+        }
       }
     }
   } finally {

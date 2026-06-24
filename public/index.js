@@ -26,6 +26,8 @@ const elements = {
   cookieInput: document.getElementById('cookie-input'),
   blacklistInput: document.getElementById('blacklist-input'),
   whitelistInput: document.getElementById('whitelist-input'),
+  limitDownloadInput: document.getElementById('limit-download-input'),
+  limitGlobalInput: document.getElementById('limit-global-input'),
   btnSaveSettings: document.getElementById('btn-save-settings'),
   pathStatusMsg: document.getElementById('path-status-msg'),
   sightsStatusMsg: document.getElementById('sights-status-msg'),
@@ -411,6 +413,16 @@ async function loadSettings() {
     } else {
       elements.whitelistInput.value = '';
     }
+    if (data.limitPerDownload) {
+      elements.limitDownloadInput.value = data.limitPerDownload;
+    } else {
+      elements.limitDownloadInput.value = '';
+    }
+    if (data.limitGlobal) {
+      elements.limitGlobalInput.value = data.limitGlobal;
+    } else {
+      elements.limitGlobalInput.value = '';
+    }
   } catch (e) {
     showToast('Failed to load settings from server', 'error');
   }
@@ -423,12 +435,14 @@ async function saveSettings() {
   const cookie = elements.cookieInput.value.trim();
   const blacklistTags = elements.blacklistInput.value.trim();
   const whitelistTags = elements.whitelistInput.value.trim();
+  const limitPerDownload = parseInt(elements.limitDownloadInput.value, 10) || 0;
+  const limitGlobal = parseInt(elements.limitGlobalInput.value, 10) || 0;
   
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wtPath, sightsPath, cookie, blacklistTags, whitelistTags })
+      body: JSON.stringify({ wtPath, sightsPath, cookie, blacklistTags, whitelistTags, limitPerDownload, limitGlobal })
     });
     
     const data = await res.json();
