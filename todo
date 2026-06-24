@@ -1,4 +1,4 @@
-- Download queue with priority ordering
+- [x] Download queue with priority ordering
 - Pause / resume downloads individually
 - Automatic retry on failed downloads
 - Bandwidth limit per download and global cap
@@ -12,4 +12,3 @@
 - Option to verify downloaded files against checksums
 - UI for filtering and sorting downloads by status
 - Support for background operation when app is minimized
-- Update checker for the manager itself

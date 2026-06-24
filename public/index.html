@@ -19,7 +19,10 @@
     <aside class="sidebar">
       <div class="logo-area">
         <div class="logo-icon">✈</div>
-        <h1>WT Live<span>Manager</span></h1>
+        <div class="logo-text-wrapper" style="display: flex; flex-direction: column;">
+          <h1 style="margin: 0; line-height: 1.1;">WT Live<span>Manager</span></h1>
+          <span id="app-version-label" style="font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; margin-top: 2px; cursor: pointer; transition: color 0.15s ease;" title="Click to check updates (Shift-Click to force debug)">v1.0.0</span>
+        </div>
       </div>
       
       <nav class="nav-menu">
@@ -33,6 +36,18 @@
           <span class="icon">📥</span> Downloads <span class="badge hidden" id="count-queue">0</span>
         </button>
       </nav>
+
+      <!-- App Update Card -->
+      <div class="update-card hidden" id="app-update-card">
+        <div class="update-card-header">
+          <span class="update-icon">⚡</span>
+          <span class="update-title">Update Available</span>
+        </div>
+        <div class="update-card-content">
+          <p>Version <strong id="app-new-version">1.1.0</strong> is available to download.</p>
+          <a href="#" id="app-update-link" target="_blank" class="update-card-action">Download Release</a>
+        </div>
+      </div>
 
       <!-- Telemetry companion box -->
       <div class="telemetry-box" id="telemetry-panel">
@@ -90,7 +105,7 @@
             <div class="settings-field">
               <label for="cookie-input" title="Gaijin Session Cookie (identity_sid)">Session Cookie:</label>
               <input type="text" id="cookie-input" placeholder="Paste identity_sid cookie to unlock restricted content (Optional)">
-              <span class="path-status info" id="cookie-status-msg" style="color: var(--accent-secondary); cursor: pointer;" onclick="alert('To get your cookie:\n1. Log in to live.warthunder.com in your browser.\n2. Press F12 (DevTools) > Application (or Storage) > Cookies.\n3. Click live.warthunder.com and copy the value of the \'identity_sid\' cookie.')">❓ How to get</span>
+              <span class="path-status info" id="cookie-status-msg" style="cursor: pointer;" onclick="alert('To get your cookie:\n1. Log in to live.warthunder.com in your browser.\n2. Press F12 (DevTools) > Application (or Storage) > Cookies.\n3. Click live.warthunder.com and copy the value of the \'identity_sid\' cookie.')">❓ How to get</span>
             </div>
             <button class="btn-primary" id="btn-save-settings">Save Settings</button>
           </div>

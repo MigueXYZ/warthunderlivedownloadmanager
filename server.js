@@ -124,8 +124,44 @@ function ensureSubdirsExist(wtPath, sightsPath) {
 }
 
 // API: Get current settings
-app.get('/api/settings', (req, res) => {
+app.get('/api/settings', async (req, res) => {
   const settings = loadSettings();
+  
+  let cookieValid = null;
+  let cookieUsername = null;
+  
+  if (settings.cookie) {
+    try {
+      const checkRes = await fetch('https://live.warthunder.com/', {
+        headers: {
+          'Cookie': `identity_sid=${settings.cookie}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      if (checkRes.ok) {
+        const html = await checkRes.text();
+        const regex = /href="https:\/\/live\.warthunder\.com\/user\/([^/"]*)\/"/;
+        const match = html.match(regex);
+        if (match) {
+          const username = match[1];
+          if (username) {
+            cookieValid = true;
+            cookieUsername = username;
+          } else {
+            cookieValid = false;
+          }
+        } else {
+          cookieValid = false;
+        }
+      } else {
+        cookieValid = false;
+      }
+    } catch (err) {
+      console.error('Error verifying Gaijin session cookie:', err);
+      cookieValid = false;
+    }
+  }
+
   res.json({
     wtPath: settings.wtPath,
     sightsPath: settings.sightsPath,
@@ -135,7 +171,9 @@ app.get('/api/settings', (req, res) => {
     detectedWT: autoDetectWTPath(),
     detectedSights: autoDetectUserSightsPath(),
     isWTValid: settings.wtPath ? fs.existsSync(settings.wtPath) : false,
-    isSightsValid: settings.sightsPath ? fs.existsSync(settings.sightsPath) : false
+    isSightsValid: settings.sightsPath ? fs.existsSync(settings.sightsPath) : false,
+    cookieValid,
+    cookieUsername
   });
 });
 
@@ -948,6 +986,59 @@ app.post('/api/queue/clear-history', (req, res) => {
   res.json({ success: true, message: 'Download history cleared.' });
 });
 
+// API: Reorder queue item (Priority ordering)
+app.post('/api/queue/reorder', (req, res) => {
+  const { id, action } = req.body; // action: 'up' | 'down' | 'top'
+  if (!id || !action) {
+    return res.status(400).json({ error: 'Missing parameters: id, action' });
+  }
+  
+  // Find the item index
+  const index = downloadQueue.findIndex(x => x.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Item not found in queue' });
+  }
+  
+  const item = downloadQueue[index];
+  if (item.status !== 'pending') {
+    return res.status(400).json({ error: 'Only pending items can be reordered' });
+  }
+  
+  // Get all pending items indexes
+  const pendingIndexes = downloadQueue
+    .map((x, i) => x.status === 'pending' ? i : -1)
+    .filter(i => i !== -1);
+    
+  const position = pendingIndexes.indexOf(index);
+  if (position === -1) {
+    return res.status(500).json({ error: 'Internal consistency error' });
+  }
+  
+  if (action === 'up' && position > 0) {
+    // Swap with the previous pending item
+    const targetIndex = pendingIndexes[position - 1];
+    downloadQueue[index] = downloadQueue[targetIndex];
+    downloadQueue[targetIndex] = item;
+  } else if (action === 'down' && position < pendingIndexes.length - 1) {
+    // Swap with the next pending item
+    const targetIndex = pendingIndexes[position + 1];
+    downloadQueue[index] = downloadQueue[targetIndex];
+    downloadQueue[targetIndex] = item;
+  } else if (action === 'top' && position > 0) {
+    // Move to the very beginning of the pending section (right after any active downloading items)
+    downloadQueue.splice(index, 1);
+    const firstPendingIndex = pendingIndexes[0];
+    downloadQueue.splice(firstPendingIndex, 0, item);
+  }
+  
+  const cleanQueue = downloadQueue.map(item => {
+    const { abortController, ...rest } = item;
+    return rest;
+  });
+  
+  res.json({ success: true, queue: cleanQueue });
+});
+
 // API: Check updates for installed modifications
 app.get('/api/installed/check-updates', async (req, res) => {
   const settings = loadSettings();
@@ -1038,6 +1129,109 @@ app.get('/api/installed/check-updates', async (req, res) => {
   }
   res.json({ updates: results });
 });
+
+// API: Check updates for the software itself
+app.get('/api/software/check-update', async (req, res) => {
+  const forceMock = req.query.force === 'true';
+  const pkgPath = path.join(__dirname, 'package.json');
+  let currentVersion = '1.0.0';
+  
+  try {
+    if (fs.existsSync(pkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      currentVersion = pkg.version || '1.0.0';
+    }
+  } catch (err) {
+    console.error('Error reading package.json version:', err);
+  }
+
+  // Support for mock testing
+  if (forceMock) {
+    return res.json({
+      currentVersion,
+      latestVersion: '1.1.0',
+      updateAvailable: true,
+      releaseUrl: 'https://github.com/MigueXYZ/warthunderlivedownloadmanager/releases',
+      releaseName: 'v1.1.0: Aero Update & Performance Improvements',
+      releaseNotes: '### Added\n- Beautiful glassmorphic UI updates\n- Support for fast batch extraction\n- Telemetry stability improvements\n\n### Fixed\n- Telemetry connection dropouts\n- Empty settings load issues'
+    });
+  }
+
+  try {
+    const response = await fetch('https://api.github.com/repos/MigueXYZ/warthunderlivedownloadmanager/releases/latest', {
+      headers: {
+        'User-Agent': 'warthunderlivedownloadmanager-updater'
+      }
+    });
+
+    if (response.status === 404) {
+      // No releases yet, check tags
+      const tagsResponse = await fetch('https://api.github.com/repos/MigueXYZ/warthunderlivedownloadmanager/tags', {
+        headers: {
+          'User-Agent': 'warthunderlivedownloadmanager-updater'
+        }
+      });
+      if (tagsResponse.ok) {
+        const tags = await tagsResponse.json();
+        if (Array.isArray(tags) && tags.length > 0) {
+          const latestTag = tags[0].name.replace(/^v/, '');
+          const updateAvailable = isNewerVersion(currentVersion, latestTag);
+          return res.json({
+            currentVersion,
+            latestVersion: latestTag,
+            updateAvailable,
+            releaseUrl: `https://github.com/MigueXYZ/warthunderlivedownloadmanager/releases/tag/v${latestTag}`,
+            releaseName: `v${latestTag}`,
+            releaseNotes: 'New tag release available on GitHub.'
+          });
+        }
+      }
+      return res.json({
+        currentVersion,
+        latestVersion: currentVersion,
+        updateAvailable: false,
+        message: 'No releases or tags found on GitHub repository.'
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`GitHub API returned status ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.tag_name) {
+      throw new Error('Invalid release payload from GitHub');
+    }
+
+    const latestVersion = data.tag_name.replace(/^v/, '');
+    const updateAvailable = isNewerVersion(currentVersion, latestVersion);
+
+    res.json({
+      currentVersion,
+      latestVersion,
+      updateAvailable,
+      releaseUrl: data.html_url,
+      releaseName: data.name || data.tag_name,
+      releaseNotes: data.body || 'No release notes provided.'
+    });
+  } catch (err) {
+    console.error('Error checking software update:', err);
+    res.status(500).json({ error: 'Failed to check for updates: ' + err.message });
+  }
+});
+
+// Helper to compare semver versions
+function isNewerVersion(current, latest) {
+  const cParts = current.split('.').map(Number);
+  const lParts = latest.split('.').map(Number);
+  for (let i = 0; i < Math.max(cParts.length, lParts.length); i++) {
+    const c = cParts[i] || 0;
+    const l = lParts[i] || 0;
+    if (l > c) return true;
+    if (l < c) return false;
+  }
+  return false;
+}
 
 // Helper: Calculate directory statistics (Total, Source Project files, Archive files, Game textures)
 function getDirectoryStats(dirPath) {

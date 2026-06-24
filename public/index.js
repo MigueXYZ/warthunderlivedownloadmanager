@@ -29,6 +29,7 @@ const elements = {
   btnSaveSettings: document.getElementById('btn-save-settings'),
   pathStatusMsg: document.getElementById('path-status-msg'),
   sightsStatusMsg: document.getElementById('sights-status-msg'),
+  cookieStatusMsg: document.getElementById('cookie-status-msg'),
   
   searchInput: document.getElementById('search-input'),
   btnSearch: document.getElementById('btn-search'),
@@ -81,7 +82,12 @@ const elements = {
   lightboxOverlay: document.getElementById('lightbox-overlay'),
   lightboxImg: document.getElementById('lightbox-img'),
   
-  toastContainer: document.getElementById('toast-container')
+  toastContainer: document.getElementById('toast-container'),
+
+  appUpdateCard: document.getElementById('app-update-card'),
+  appNewVersion: document.getElementById('app-new-version'),
+  appUpdateLink: document.getElementById('app-update-link'),
+  appVersionLabel: document.getElementById('app-version-label')
 };
 
 // Initial Setup
@@ -90,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadLibrary();
   updateFilterVisibility();
   fetchFeed();
+  checkSoftwareUpdate();
   
   // Start telemetry polling
   pollTelemetry();
@@ -237,6 +244,15 @@ function setupEventListeners() {
       filterLibrary();
     }
   });
+
+  // Check for software updates on version label click (Shift-Click to force debug)
+  if (elements.appVersionLabel) {
+    elements.appVersionLabel.addEventListener('click', (e) => {
+      const forceMock = e.shiftKey;
+      showToast(forceMock ? 'Checking for software updates (Debug)...' : 'Checking for software updates...', 'info');
+      checkSoftwareUpdate(forceMock, true);
+    });
+  }
 }
 
 // Format WT Internal CDK vehicle names to a clean hashtag for WT Live search
@@ -290,6 +306,52 @@ function switchTab(tab) {
   }
 }
 
+// Check for software updates
+async function checkSoftwareUpdate(forceMock = false, isManual = false) {
+  try {
+    const url = forceMock ? '/api/software/check-update?force=true' : '/api/software/check-update';
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (isManual) {
+        showToast('Failed to check for software updates.', 'error');
+      }
+      return;
+    }
+    const data = await res.json();
+    
+    // Update current version label
+    if (elements.appVersionLabel) {
+      elements.appVersionLabel.textContent = `v${data.currentVersion}`;
+    }
+    
+    if (data.updateAvailable) {
+      if (elements.appNewVersion) {
+        elements.appNewVersion.textContent = data.latestVersion;
+      }
+      if (elements.appUpdateLink) {
+        elements.appUpdateLink.href = data.releaseUrl;
+        elements.appUpdateLink.title = data.releaseName || `Version ${data.latestVersion}`;
+      }
+      if (elements.appUpdateCard) {
+        elements.appUpdateCard.classList.remove('hidden');
+      }
+      showToast(`A new software version (v${data.latestVersion}) is available!`, 'warning');
+    } else {
+      if (elements.appUpdateCard && !forceMock) {
+        elements.appUpdateCard.classList.add('hidden');
+      }
+      if (isManual) {
+        showToast(`WT Live Manager is up to date (v${data.currentVersion}).`, 'success');
+      }
+    }
+  } catch (e) {
+    console.error('Failed to check for software updates:', e);
+    if (isManual) {
+      showToast('Error checking for software updates.', 'error');
+    }
+  }
+}
+
 // API: Load Settings
 async function loadSettings() {
   try {
@@ -318,6 +380,25 @@ async function loadSettings() {
 
     if (data.cookie) {
       elements.cookieInput.value = data.cookie;
+      if (data.cookieValid === true) {
+        elements.cookieStatusMsg.textContent = `✓ Active (${data.cookieUsername})`;
+        elements.cookieStatusMsg.className = 'path-status valid';
+        elements.cookieStatusMsg.style.color = 'var(--color-success)';
+      } else if (data.cookieValid === false) {
+        elements.cookieStatusMsg.textContent = `✗ Expired/Invalid Session Cookie`;
+        elements.cookieStatusMsg.className = 'path-status invalid';
+        elements.cookieStatusMsg.style.color = 'var(--color-error)';
+        showToast('Your Gaijin session cookie has expired or is invalid. Restricted content might be hidden.', 'warning');
+      } else {
+        elements.cookieStatusMsg.textContent = `❓ Verify session status`;
+        elements.cookieStatusMsg.className = 'path-status info';
+        elements.cookieStatusMsg.style.color = 'var(--accent-secondary)';
+      }
+    } else {
+      elements.cookieInput.value = '';
+      elements.cookieStatusMsg.textContent = `❓ How to get`;
+      elements.cookieStatusMsg.className = 'path-status info';
+      elements.cookieStatusMsg.style.color = 'var(--accent-secondary)';
     }
     if (data.blacklistTags) {
       elements.blacklistInput.value = data.blacklistTags;
@@ -364,6 +445,7 @@ async function saveSettings() {
       }
 
       showToast('Settings saved successfully!', 'success');
+      await loadSettings(); // Refresh cookie validation status & profile fields
       loadLibrary();
       fetchFeed(); // Re-fetch feed in case cookie or filters change content visibility
     } else {
@@ -1490,6 +1572,7 @@ function classifyItem(item) {
 
 // Global window functions for the Queue
 window.cancelDownload = cancelDownload;
+window.reorderQueue = reorderQueue;
 window.clearQueueHistory = clearQueueHistory;
 window.addModToQueueById = addModToQueueById;
 window.pollQueue = pollQueue;
@@ -1587,6 +1670,27 @@ async function cancelDownload(id) {
   }
 }
 
+// Reorder queue item
+async function reorderQueue(id, action) {
+  try {
+    const res = await fetch('/api/queue/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.queueList.queue = data.queue;
+      renderQueueLists();
+      showToast('Queue reordered.', 'success');
+    } else {
+      showToast(data.error || 'Failed to reorder queue.', 'error');
+    }
+  } catch (e) {
+    showToast('Failed to reorder queue.', 'error');
+  }
+}
+
 // Clear finished downloads from history
 async function clearQueueHistory() {
   try {
@@ -1650,10 +1754,17 @@ function renderQueueLists() {
 
   // 2. Render Pending Queue
   if (queue && queue.length > 0) {
-    elements.pendingQueueContainer.innerHTML = queue.map(item => {
+    elements.pendingQueueContainer.innerHTML = queue.map((item, idx) => {
       const thumbnail = item.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
       const cleanTitle = item.title || item.name;
       const authorName = item.author ? item.author.nickname : 'Anonymous';
+      
+      const isFirst = idx === 0;
+      const isLast = idx === queue.length - 1;
+      
+      const upDisabled = isFirst ? 'disabled title="Already at the top"' : 'title="Move Up"';
+      const downDisabled = isLast ? 'disabled title="Already at the bottom"' : 'title="Move Down"';
+      const topDisabled = isFirst ? 'disabled title="Already at the top"' : 'title="Move to Top"';
       
       return `
         <div class="download-card" style="margin-bottom: 8px;">
@@ -1665,11 +1776,14 @@ function renderQueueLists() {
             </div>
             <div class="download-meta">By <span>${authorName}</span></div>
             <div class="download-status-container">
-              <span class="download-status-text pending">Queued (Waiting...)</span>
+              <span class="download-status-text pending">Queued (Position #${idx + 1})</span>
             </div>
           </div>
-          <div class="download-actions">
-            <button class="btn-cancel-dl" onclick="cancelDownload('${item.id}')">Remove</button>
+          <div class="download-actions" style="display: flex; gap: 4px; align-items: center;">
+            <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'top')" ${topDisabled}>⇈</button>
+            <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'up')" ${upDisabled}>↑</button>
+            <button class="btn-order-dl" onclick="reorderQueue('${item.id}', 'down')" ${downDisabled}>↓</button>
+            <button class="btn-cancel-dl" onclick="cancelDownload('${item.id}')" title="Remove from queue">✕</button>
           </div>
         </div>
       `;
