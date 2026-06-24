@@ -87,7 +87,8 @@ const elements = {
   appUpdateCard: document.getElementById('app-update-card'),
   appNewVersion: document.getElementById('app-new-version'),
   appUpdateLink: document.getElementById('app-update-link'),
-  appVersionLabel: document.getElementById('app-version-label')
+  appVersionLabel: document.getElementById('app-version-label'),
+  cookieOverlay: document.getElementById('cookie-overlay')
 };
 
 // Initial Setup
@@ -1582,6 +1583,9 @@ window.openStorageModal = openStorageModal;
 window.closeStorageModal = closeStorageModal;
 window.cleanSingleMod = cleanSingleMod;
 window.cleanAllStorage = cleanAllStorage;
+window.openCookieModal = openCookieModal;
+window.closeCookieModal = closeCookieModal;
+window.copyCookieSnippet = copyCookieSnippet;
 
 // ==========================================
 // DOWNLOAD QUEUE HANDLERS & RENDERING
@@ -2131,5 +2135,32 @@ async function cleanAllStorage(btnElement) {
       btnElement.disabled = false;
       btnElement.innerText = '🧹 Clean All Source & Archive Files';
     }
+  }
+}
+
+// Open the cookie instructions modal
+function openCookieModal() {
+  if (elements.cookieOverlay) {
+    elements.cookieOverlay.classList.remove('hidden');
+  }
+}
+
+// Close the cookie instructions modal
+function closeCookieModal() {
+  if (elements.cookieOverlay) {
+    elements.cookieOverlay.classList.add('hidden');
+  }
+}
+
+// Copy the console JavaScript snippet to get the cookie
+function copyCookieSnippet() {
+  const codeEl = document.getElementById('cookie-code-snippet');
+  if (codeEl) {
+    const code = codeEl.textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      showToast('Consola snippet copiado para a área de transferência!', 'success');
+    }).catch(() => {
+      showToast('Erro ao copiar. Selecione e copie manualmente.', 'error');
+    });
   }
 }

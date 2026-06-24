@@ -132,9 +132,9 @@ app.get('/api/settings', async (req, res) => {
   
   if (settings.cookie) {
     try {
-      const checkRes = await fetch('https://live.warthunder.com/', {
+      const checkRes = await fetch('https://live.warthunder.com/feed/all/', {
         headers: {
-          'Cookie': `identity_sid=${settings.cookie}`,
+          'Cookie': `token=${settings.cookie}`,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
       });
@@ -237,7 +237,7 @@ app.post('/api/feed', async (req, res) => {
 
     // Include the Gaijin session cookie if configured
     if (settings.cookie) {
-      headers['Cookie'] = `identity_sid=${settings.cookie}`;
+      headers['Cookie'] = `token=${settings.cookie}`;
     }
 
     const response = await fetch('https://live.warthunder.com/api/feed/get_regular/', {
@@ -313,7 +313,7 @@ async function downloadFile(url, destPath, cookie) {
   };
 
   if (cookie) {
-    headers['Cookie'] = `identity_sid=${cookie}`;
+    headers['Cookie'] = `token=${cookie}`;
   }
 
   const response = await fetch(url, { headers });
@@ -346,7 +346,7 @@ async function downloadFileWithSignal(url, destPath, cookie, signal, onProgress)
   };
 
   if (cookie) {
-    headers['Cookie'] = `identity_sid=${cookie}`;
+    headers['Cookie'] = `token=${cookie}`;
   }
 
   const response = await fetch(url, { headers, signal });
@@ -442,7 +442,7 @@ async function processQueue() {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           };
           if (settings.cookie) {
-            downloadHeaders['Cookie'] = `identity_sid=${settings.cookie}`;
+            downloadHeaders['Cookie'] = `token=${settings.cookie}`;
           }
           await fetch('https://live.warthunder.com/api/post/downloaded/', {
             method: 'POST',
@@ -673,7 +673,7 @@ app.post('/api/download', async (req, res) => {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         };
         if (settings.cookie) {
-          downloadHeaders['Cookie'] = `identity_sid=${settings.cookie}`;
+          downloadHeaders['Cookie'] = `token=${settings.cookie}`;
         }
 
         await fetch('https://live.warthunder.com/api/post/downloaded/', {
@@ -1090,7 +1090,7 @@ app.get('/api/installed/check-updates', async (req, res) => {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
   };
   if (settings.cookie) {
-    headers['Cookie'] = `identity_sid=${settings.cookie}`;
+    headers['Cookie'] = `token=${settings.cookie}`;
   }
 
   for (const mod of installedList) {

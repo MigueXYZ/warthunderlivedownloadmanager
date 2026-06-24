@@ -103,9 +103,9 @@
           </div>
           <div class="settings-row">
             <div class="settings-field">
-              <label for="cookie-input" title="Gaijin Session Cookie (identity_sid)">Session Cookie:</label>
-              <input type="text" id="cookie-input" placeholder="Paste identity_sid cookie to unlock restricted content (Optional)">
-              <span class="path-status info" id="cookie-status-msg" style="cursor: pointer;" onclick="alert('To get your cookie:\n1. Log in to live.warthunder.com in your browser.\n2. Press F12 (DevTools) > Application (or Storage) > Cookies.\n3. Click live.warthunder.com and copy the value of the \'identity_sid\' cookie.')">❓ How to get</span>
+              <label for="cookie-input" title="Gaijin Session Cookie (token)">Session Cookie:</label>
+              <input type="text" id="cookie-input" placeholder="Paste session 'token' cookie to unlock restricted content (Optional)">
+              <span class="path-status info" id="cookie-status-msg" style="cursor: pointer;" onclick="openCookieModal()">❓ How to get</span>
             </div>
             <button class="btn-primary" id="btn-save-settings">Save Settings</button>
           </div>
@@ -338,6 +338,46 @@
           <div class="storage-mods-list" id="storage-mods-list-container">
             <!-- Dynamically populated list -->
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cookie Info Modal -->
+  <div class="overlay hidden" id="cookie-overlay">
+    <div class="overlay-card storage-card" style="max-width: 550px;">
+      <div class="storage-modal-header">
+        <h2>🔑 Session Cookie Guide (Optional)</h2>
+        <button class="close-modal-btn" onclick="closeCookieModal()">&times;</button>
+      </div>
+      <div class="storage-modal-body" style="display: flex; flex-direction: column; gap: 16px; font-size: 13px; line-height: 1.5; color: var(--text-main);">
+        <p style="background: rgba(255, 170, 0, 0.06); border: 1px solid rgba(255, 170, 0, 0.2); border-radius: var(--radius-sm); padding: 12px; margin: 0; color: var(--text-main);">
+          💡 <strong>Opcional:</strong> Podes usar esta aplicação perfeitamente sem qualquer cookie. O cookie apenas serve para contornar os filtros da Gaijin no site WT Live, permitindo procurar e descarregar skins históricas restritas ou conteúdos anime que requerem autenticação.
+        </p>
+
+        <div>
+          <h3 style="color: var(--accent-secondary); margin-bottom: 6px; font-family: var(--font-family-display);">⚡ Método Automático (Recomendado)</h3>
+          <p style="margin-bottom: 8px; color: var(--text-muted);">Copia o código abaixo, abre o site <a href="https://live.warthunder.com" target="_blank" style="color: var(--accent-primary); text-decoration: underline;">live.warthunder.com</a> (com login feito), abre a consola do browser (<strong>F12 -> Consola</strong>), cola o código e prime <strong>Enter</strong>. O token será copiado automaticamente!</p>
+          <div style="position: relative; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 12px; font-family: monospace; font-size: 11px; word-break: break-all; color: var(--accent-primary); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <code id="cookie-code-snippet">copy(document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1] || 'Login required!');</code>
+            <button class="btn-clean-single" style="flex-shrink: 0;" onclick="copyCookieSnippet()">📋 Copiar</button>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-color); padding-top: 12px;">
+          <h3 style="color: var(--text-muted); margin-bottom: 6px; font-family: var(--font-family-display);">🛠️ Método Manual (Sem correr código)</h3>
+          <p style="color: var(--text-muted); margin-bottom: 4px;">Se preferires não correr código na consola, podes ir buscá-lo manualmente:</p>
+          <ol style="margin-left: 20px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">
+            <li>Inicia sessão no site <a href="https://live.warthunder.com" target="_blank" style="color: var(--accent-primary); text-decoration: underline;">live.warthunder.com</a>.</li>
+            <li>Prime <strong>F12</strong> no teu teclado (Ferramentas de Programador).</li>
+            <li>Acede ao separador <strong>Application</strong> (Chrome/Edge) ou <strong>Storage</strong> (Firefox).</li>
+            <li>Na barra lateral, expande <strong>Cookies</strong> e clica em <code style="color: var(--text-main);">https://live.warthunder.com</code>.</li>
+            <li>Procura o cookie chamado <strong>token</strong> e copia o seu valor completo.</li>
+          </ol>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+          <button class="btn-secondary" onclick="closeCookieModal()">Fechar</button>
         </div>
       </div>
     </div>
