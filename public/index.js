@@ -90,7 +90,8 @@ const elements = {
   appNewVersion: document.getElementById('app-new-version'),
   appUpdateLink: document.getElementById('app-update-link'),
   appVersionLabel: document.getElementById('app-version-label'),
-  cookieOverlay: document.getElementById('cookie-overlay')
+  cookieOverlay: document.getElementById('cookie-overlay'),
+  settingsOverlay: document.getElementById('settings-overlay')
 };
 
 // Initial Setup
@@ -307,6 +308,17 @@ function switchTab(tab) {
     elements.btnTabQueue.classList.add('active');
     pollQueue(); // Poll immediately when switching to queue
   }
+
+  // Update top bar title
+  const titleMap = {
+    'browse': 'Browse WT Live',
+    'library': 'My Library',
+    'queue': 'Downloads'
+  };
+  const titleEl = document.getElementById('top-bar-title');
+  if (titleEl && titleMap[tab]) {
+    titleEl.textContent = titleMap[tab];
+  }
 }
 
 // Check for software updates
@@ -463,6 +475,7 @@ async function saveSettings() {
       await loadSettings(); // Refresh cookie validation status & profile fields
       loadLibrary();
       fetchFeed(); // Re-fetch feed in case cookie or filters change content visibility
+      closeSettingsModal();
     } else {
       showToast(data.error || 'Failed to save settings.', 'error');
     }
@@ -766,8 +779,8 @@ function renderCards(list) {
 window.changeCardImage = function(btn, dir, event) {
   event.stopPropagation(); // Prevent card clicks or fullscreen opening
   
-  const mediaContainer = btn.closest('.card-media');
-  const img = mediaContainer.querySelector('.card-img');
+  const mediaContainer = btn.closest('.card-media, .lib-card-media');
+  const img = mediaContainer.querySelector('.card-img, img');
   const images = JSON.parse(mediaContainer.getAttribute('data-images'));
   let index = parseInt(mediaContainer.getAttribute('data-index'), 10);
   
@@ -1061,6 +1074,21 @@ function renderLibraryLists() {
         `;
       }
 
+      // Quick metadata stats line
+      let quickStatsHtml = '';
+      if (metadata.likes !== undefined || metadata.views !== undefined || metadata.downloads !== undefined) {
+        const likes = metadata.likes || 0;
+        const views = metadata.views || 0;
+        const downloads = metadata.downloads || 0;
+        quickStatsHtml = `
+          <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 10px; margin-top: 4px; margin-bottom: 4px;">
+            <span>👍 ${likes}</span>
+            <span>👁️ ${views}</span>
+            <span>📥 ${downloads}</span>
+          </div>
+        `;
+      }
+
       const card = document.createElement('div');
       card.className = `lib-card ${skin.disabled ? 'disabled' : ''}`;
       card.setAttribute('data-name', skin.name.toLowerCase());
@@ -1068,20 +1096,22 @@ function renderLibraryLists() {
         card.setAttribute('data-blkfiles', JSON.stringify(skin.blkFiles));
       }
       card.innerHTML = `
-        <div class="lib-card-media" onclick="openFullscreenImage(this.querySelector('img').src, [this.querySelector('img').src], 0, event)">
+        <div class="lib-card-media" onclick="openModDetailsModal('camouflage', '${skin.name}')" style="cursor: pointer;">
           <img src="${imageUrl}" alt="${displayTitle}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=No+Preview'">
           ${skin.disabled ? '<span class="disabled-badge">Disabled</span>' : ''}
           ${updateBadgeHtml}
         </div>
-        <div class="lib-card-content">
+        <div class="lib-card-content" onclick="openModDetailsModal('camouflage', '${skin.name}')" style="cursor: pointer;">
           <div class="lib-card-title" title="${displayTitle}">${displayTitle}</div>
           <div class="lib-card-meta">
             ${authorHtml}
             <span>📅 ${dateStr}</span>
             <span>${typeSpecificMeta}</span>
           </div>
-          <div class="lib-card-actions">
+          ${quickStatsHtml}
+          <div class="lib-card-actions" onclick="event.stopPropagation()">
             ${updateBtnHtml}
+            <button class="btn-secondary" onclick="openModDetailsModal('camouflage', '${skin.name}')">ℹ️ Details</button>
             <button class="btn-toggle ${skin.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('camouflage', '${skin.name}')">
               ${skin.disabled ? '🟢 Enable' : '🔴 Disable'}
             </button>
@@ -1143,23 +1173,41 @@ function renderLibraryLists() {
         `;
       }
 
+      // Quick metadata stats line
+      let quickStatsHtml = '';
+      if (metadata.likes !== undefined || metadata.views !== undefined || metadata.downloads !== undefined) {
+        const likes = metadata.likes || 0;
+        const views = metadata.views || 0;
+        const downloads = metadata.downloads || 0;
+        quickStatsHtml = `
+          <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 10px; margin-top: 4px; margin-bottom: 4px;">
+            <span>👍 ${likes}</span>
+            <span>👁️ ${views}</span>
+            <span>📥 ${downloads}</span>
+          </div>
+        `;
+      }
+
       const card = document.createElement('div');
       card.className = `lib-card ${sight.disabled ? 'disabled' : ''}`;
+      card.setAttribute('data-name', sight.name.toLowerCase());
       card.innerHTML = `
-        <div class="lib-card-media" onclick="openFullscreenImage(this.querySelector('img').src, [this.querySelector('img').src], 0, event)">
+        <div class="lib-card-media" onclick="openModDetailsModal('sight', '${sight.name}')" style="cursor: pointer;">
           <img src="${imageUrl}" alt="${displayTitle}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=No+Preview'">
           ${sight.disabled ? '<span class="disabled-badge">Disabled</span>' : ''}
           ${updateBadgeHtml}
         </div>
-        <div class="lib-card-content">
+        <div class="lib-card-content" onclick="openModDetailsModal('sight', '${sight.name}')" style="cursor: pointer;">
           <div class="lib-card-title" title="${displayTitle}">${displayTitle}</div>
           <div class="lib-card-meta">
             ${authorHtml}
             <span>📅 ${dateStr}</span>
             <span>${typeSpecificMeta}</span>
           </div>
-          <div class="lib-card-actions">
+          ${quickStatsHtml}
+          <div class="lib-card-actions" onclick="event.stopPropagation()">
             ${updateBtnHtml}
+            <button class="btn-secondary" onclick="openModDetailsModal('sight', '${sight.name}')">ℹ️ Details</button>
             <button class="btn-toggle ${sight.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('sight', '${sight.name}')">
               ${sight.disabled ? '🟢 Enable' : '🔴 Disable'}
             </button>
@@ -1599,6 +1647,8 @@ window.cleanSingleMod = cleanSingleMod;
 window.cleanAllStorage = cleanAllStorage;
 window.openCookieModal = openCookieModal;
 window.closeCookieModal = closeCookieModal;
+window.openSettingsModal = openSettingsModal;
+window.closeSettingsModal = closeSettingsModal;
 window.copyCookieSnippet = copyCookieSnippet;
 window.pauseDownload = pauseDownload;
 window.resumeDownload = resumeDownload;
@@ -2267,6 +2317,23 @@ function closeCookieModal() {
   }
 }
 
+// Open the settings modal
+function openSettingsModal() {
+  if (elements.settingsOverlay) {
+    elements.settingsOverlay.classList.remove('hidden');
+  }
+}
+
+// Close the settings modal
+function closeSettingsModal(event) {
+  if (event) {
+    if (event.target !== document.getElementById('settings-overlay')) return;
+  }
+  if (elements.settingsOverlay) {
+    elements.settingsOverlay.classList.add('hidden');
+  }
+}
+
 // Copy the console JavaScript snippet to get the cookie
 function copyCookieSnippet() {
   const codeEl = document.getElementById('cookie-code-snippet');
@@ -2279,3 +2346,163 @@ function copyCookieSnippet() {
     });
   }
 }
+
+// Open the Modification Details Modal
+window.openModDetailsModal = function(type, name) {
+  const list = type === 'camouflage' ? state.installedList.skins : state.installedList.sights;
+  const mod = list.find(m => m.name === name);
+  if (!mod) {
+    showToast('Modification not found.', 'error');
+    return;
+  }
+  
+  const metadata = mod.metadata || {};
+  const displayTitle = metadata.title || cleanFilename(metadata.fileName || mod.name);
+  const imageUrl = metadata.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
+  
+  // Author
+  let authorHtml = '<span style="color: var(--text-muted); font-size: 13px;">Unknown Author</span>';
+  if (metadata.author && metadata.author.nickname) {
+    const avatar = metadata.author.avatar || 'https://placehold.co/150x150/111317/fff?text=U';
+    authorHtml = `
+      <div class="lib-item-author" style="font-size: 13px;">
+        <img src="${avatar}" alt="${metadata.author.nickname}" style="width: 24px; height: 24px; border-radius: 50%;" onerror="this.style.display='none'">
+        <strong style="color: var(--text-main);">${metadata.author.nickname}</strong>
+      </div>
+    `;
+  }
+  
+  // Stats
+  let statsHtml = '<div style="color: var(--text-muted); font-size: 12px;">No stats available (run Check Updates to query WT Live).</div>';
+  if (metadata.likes !== undefined || metadata.views !== undefined || metadata.downloads !== undefined) {
+    const likes = metadata.likes || 0;
+    const views = metadata.views || 0;
+    const downloads = metadata.downloads || 0;
+    const comments = metadata.comments || 0;
+    statsHtml = `
+      <div class="card-stats" style="font-size: 13px; gap: 24px; margin-top: 4px;">
+        <span>👍 <strong>${likes}</strong> Likes</span>
+        <span>👁️ <strong>${views}</strong> Views</span>
+        <span>📥 <strong>${downloads}</strong> Downloads</span>
+        ${comments ? `<span>💬 <strong>${comments}</strong> Comments</span>` : ''}
+      </div>
+    `;
+  }
+
+  // Description
+  const descriptionHtml = metadata.description || `<p style="color: var(--text-muted); font-style: italic;">No description available.</p>`;
+
+  // Images Carousel
+  const imagesList = (metadata.images && metadata.images.length > 0) ? metadata.images.map(img => img.src) : [imageUrl];
+  const hasMultipleImages = imagesList.length > 1;
+  
+  let dotsHtml = '';
+  if (hasMultipleImages) {
+    dotsHtml = `<div class="gallery-dots" style="bottom: 12px;">`;
+    imagesList.forEach((_, idx) => {
+      dotsHtml += `<span class="gallery-dot ${idx === 0 ? 'active' : ''}"></span>`;
+    });
+    dotsHtml += `</div>`;
+  }
+
+  const carouselHtml = `
+    <div class="card-media" data-images='${JSON.stringify(imagesList)}' data-index="0" style="aspect-ratio: 16 / 9; border-radius: var(--radius-md); overflow: hidden; position: relative;">
+      <img class="card-img" src="${imageUrl}" alt="${displayTitle}" style="width: 100%; height: 100%; object-fit: cover; cursor: zoom-in;" onclick="openFullscreenImage(this.src, JSON.parse(this.parentNode.getAttribute('data-images')), parseInt(this.parentNode.getAttribute('data-index'), 10), event)">
+      ${hasMultipleImages ? `
+        <button class="gallery-btn prev" onclick="changeCardImage(this, -1, event)" style="width: 32px; height: 32px; font-size: 18px; left: 12px; opacity: 1;">‹</button>
+        ${dotsHtml}
+        <button class="gallery-btn next" onclick="changeCardImage(this, 1, event)" style="width: 32px; height: 32px; font-size: 18px; right: 12px; opacity: 1;">›</button>
+      ` : ''}
+    </div>
+  `;
+
+  // General Metadata Info Table
+  const dateStr = new Date(mod.installedAt).toLocaleString();
+  const blkStatus = type === 'camouflage' ? (mod.hasBlk ? '🟢 BLK OK' : '⚠️ Missing BLK') : `🎯 Files: ${mod.filesCount}`;
+  const filesListHtml = type === 'camouflage' && mod.blkFiles && mod.blkFiles.length > 0 
+    ? `<div style="margin-top: 4px; font-family: monospace; font-size: 11px; color: var(--accent-primary);">${mod.blkFiles.join(', ')}</div>` 
+    : '';
+
+  // Update check button / info
+  const update = state.updatesList && state.updatesList.find(u => u.postId === metadata.postId && u.type === type);
+  let updateSectionHtml = '';
+  if (update) {
+    updateSectionHtml = `
+      <div style="background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.2); border-radius: var(--radius-sm); padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px;">
+        <div>
+          <span style="color: var(--accent-secondary); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Update Available!</span>
+          <div style="color: var(--text-muted); font-size: 11px; margin-top: 2px;">A newer version of this modification is available on WT Live.</div>
+        </div>
+        <button class="btn-primary" onclick="installUpdate(${JSON.stringify(update).replace(/"/g, '&quot;')}, this); closeModDetailsModal();" style="padding: 6px 16px; font-size: 12px;">
+          🔄 Update Now
+        </button>
+      </div>
+    `;
+  }
+
+  // Build the complete body HTML
+  const bodyEl = document.getElementById('mod-details-body');
+  document.getElementById('mod-details-title').innerText = displayTitle;
+  
+  bodyEl.innerHTML = `
+    ${updateSectionHtml}
+    
+    ${carouselHtml}
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-top: 8px;">
+      ${authorHtml}
+      ${statsHtml}
+    </div>
+    
+    <div>
+      <h3 style="color: var(--accent-secondary); margin-bottom: 8px; font-family: var(--font-family-display); font-size: 14px; display: flex; align-items: center; gap: 6px;">
+        📄 Description
+      </h3>
+      <div style="max-height: 200px; overflow-y: auto; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; font-size: 12px; line-height: 1.5;">
+        ${descriptionHtml}
+      </div>
+    </div>
+    
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
+      <div>
+        <span style="color: var(--text-muted); display: block;">📂 Installation Path</span>
+        <strong style="word-break: break-all; color: var(--text-main); font-size: 11px; font-family: monospace;">${mod.path}</strong>
+      </div>
+      <div>
+        <span style="color: var(--text-muted); display: block;">📅 Installed At</span>
+        <strong style="color: var(--text-main);">${dateStr}</strong>
+      </div>
+      <div>
+        <span style="color: var(--text-muted); display: block;">🔍 Local Status</span>
+        <strong style="color: var(--text-main);">${blkStatus}</strong>
+        ${filesListHtml}
+      </div>
+      <div>
+        <span style="color: var(--text-muted); display: block;">🆔 WT Live Post ID</span>
+        <strong style="color: var(--text-main);">${metadata.postId || 'N/A (Pasted Link / Unknown)'}</strong>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 8px;">
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-toggle ${mod.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('${type}', '${mod.name}'); closeModDetailsModal();" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); cursor: pointer;">
+          ${mod.disabled ? '🟢 Enable Mod' : '🔴 Disable Mod'}
+        </button>
+        <button class="btn-delete" onclick="deleteMod('${type}', '${mod.name}'); closeModDetailsModal();" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); cursor: pointer;">
+          🗑️ Delete Mod
+        </button>
+      </div>
+      <button class="btn-secondary" onclick="closeModDetailsModal()" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); cursor: pointer;">
+        Close
+      </button>
+    </div>
+  `;
+  
+  document.getElementById('mod-details-overlay').classList.remove('hidden');
+};
+
+// Close the Modification Details Modal
+window.closeModDetailsModal = function(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('mod-details-overlay').classList.add('hidden');
+};

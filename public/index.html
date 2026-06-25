@@ -76,49 +76,14 @@
     <!-- Main Content Area -->
     <main class="main-content">
       
-      <!-- Top Settings Bar -->
+      <!-- Top Bar -->
       <header class="top-bar">
-        <div class="settings-container">
-          <div class="settings-row">
-            <div class="settings-field">
-              <label for="wt-path-input">Game Folder:</label>
-              <input type="text" id="wt-path-input" placeholder="e.g. C:\Program Files (x86)\Steam\steamapps\common\War Thunder">
-              <span class="path-status" id="path-status-msg">Checking...</span>
-            </div>
-            <div class="settings-field">
-              <label for="sights-path-input">Sights Folder:</label>
-              <input type="text" id="sights-path-input" placeholder="e.g. C:\Users\...\Documents\My Games\WarThunder\Saves\...\UserSights">
-              <span class="path-status" id="sights-status-msg">Checking...</span>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-field">
-              <label for="blacklist-input" title="Comma-separated list of tags to hide (e.g. #anime, #fictional)">Blacklist Tags:</label>
-              <input type="text" id="blacklist-input" placeholder="e.g. #anime, #fictional (hides matching content)">
-            </div>
-            <div class="settings-field">
-              <label for="whitelist-input" title="Comma-separated list of tags to show exclusively (e.g. #historical)">Whitelist Tags:</label>
-              <input type="text" id="whitelist-input" placeholder="e.g. #historical (shows only matching content, leave empty for all)">
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-field">
-              <label for="limit-download-input" title="Max download speed for a single file in KB/s. Leave empty or 0 for unlimited.">Limit per Download (KB/s):</label>
-              <input type="number" id="limit-download-input" min="0" placeholder="e.g. 1024 (1 MB/s), 0 for unlimited">
-            </div>
-            <div class="settings-field">
-              <label for="limit-global-input" title="Max total download speed in KB/s. Leave empty or 0 for unlimited.">Global Speed Cap (KB/s):</label>
-              <input type="number" id="limit-global-input" min="0" placeholder="e.g. 2048 (2 MB/s), 0 for unlimited">
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-field">
-              <label for="cookie-input" title="Gaijin Session Cookie (token)">Session Cookie:</label>
-              <input type="text" id="cookie-input" placeholder="Paste session 'token' cookie to unlock restricted content (Optional)">
-              <span class="path-status info" id="cookie-status-msg" style="cursor: pointer;" onclick="openCookieModal()">❓ How to get</span>
-            </div>
-            <button class="btn-primary" id="btn-save-settings">Save Settings</button>
-          </div>
+        <h2 id="top-bar-title" class="top-bar-title">Browse WT Live</h2>
+        <div class="top-bar-actions">
+          <button class="btn-top-settings" onclick="openSettingsModal()">
+            <span class="icon">⚙️</span>
+            <span>Settings</span>
+          </button>
         </div>
       </header>
 
@@ -388,6 +353,104 @@
 
         <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
           <button class="btn-secondary" onclick="closeCookieModal()">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mod Details Modal -->
+  <div class="overlay hidden" id="mod-details-overlay" onclick="closeModDetailsModal(event)">
+    <div class="overlay-card storage-card" style="max-width: 680px;" onclick="event.stopPropagation()">
+      <div class="storage-modal-header">
+        <h2 id="mod-details-title">Modification Details</h2>
+        <button class="close-modal-btn" onclick="closeModDetailsModal()">&times;</button>
+      </div>
+      <div class="storage-modal-body" id="mod-details-body" style="display: flex; flex-direction: column; gap: 16px; font-size: 13px; color: var(--text-main); max-height: 75vh; overflow-y: auto; padding-right: 8px;">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal (Gemini Style) -->
+  <div class="overlay hidden" id="settings-overlay" onclick="closeSettingsModal(event)">
+    <div class="overlay-card gemini-card" onclick="event.stopPropagation()">
+      <div class="gemini-gradient-bar"></div>
+      <div class="storage-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 20px;">⚙️</span>
+          <h2 style="font-family: var(--font-family-display); font-weight: 700;">Settings</h2>
+        </div>
+        <button class="close-modal-btn" onclick="closeSettingsModal()">&times;</button>
+      </div>
+      <div class="storage-modal-body gemini-modal-body">
+        
+        <!-- Section: Game Paths -->
+        <div class="settings-section">
+          <h3>📂 Game Directories</h3>
+          <div class="settings-grid">
+            <div class="settings-field-vertical">
+              <label for="wt-path-input">Game Folder:</label>
+              <div class="input-with-status">
+                <input type="text" id="wt-path-input" placeholder="e.g. C:\Program Files (x86)\Steam\steamapps\common\War Thunder">
+                <span class="path-status" id="path-status-msg">Checking...</span>
+              </div>
+            </div>
+            <div class="settings-field-vertical">
+              <label for="sights-path-input">Sights Folder:</label>
+              <div class="input-with-status">
+                <input type="text" id="sights-path-input" placeholder="e.g. C:\Users\...\Documents\My Games\WarThunder\Saves\...\UserSights">
+                <span class="path-status" id="sights-status-msg">Checking...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Tag Filters -->
+        <div class="settings-section">
+          <h3>🏷️ Tag Filters</h3>
+          <div class="settings-grid">
+            <div class="settings-field-vertical">
+              <label for="blacklist-input" title="Comma-separated list of tags to hide (e.g. #anime, #fictional)">Blacklist Tags:</label>
+              <input type="text" id="blacklist-input" placeholder="e.g. #anime, #fictional (hides matching content)">
+            </div>
+            <div class="settings-field-vertical">
+              <label for="whitelist-input" title="Comma-separated list of tags to show exclusively (e.g. #historical)">Whitelist Tags:</label>
+              <input type="text" id="whitelist-input" placeholder="e.g. #historical (shows only matching content)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Download Limits -->
+        <div class="settings-section">
+          <h3>⚡ Download Speed Limits</h3>
+          <div class="settings-grid">
+            <div class="settings-field-vertical">
+              <label for="limit-download-input" title="Max download speed for a single file in KB/s. Leave empty or 0 for unlimited.">Limit per Download (KB/s):</label>
+              <input type="number" id="limit-download-input" min="0" placeholder="e.g. 1024 (1 MB/s), 0 for unlimited">
+            </div>
+            <div class="settings-field-vertical">
+              <label for="limit-global-input" title="Max total download speed in KB/s. Leave empty or 0 for unlimited.">Global Speed Cap (KB/s):</label>
+              <input type="number" id="limit-global-input" min="0" placeholder="e.g. 2048 (2 MB/s), 0 for unlimited">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Session Cookie -->
+        <div class="settings-section">
+          <h3>🔑 Authentication</h3>
+          <div class="settings-field-vertical">
+            <label for="cookie-input" title="Gaijin Session Cookie (token)">Session Cookie (token):</label>
+            <div class="input-with-status-horizontal">
+              <input type="text" id="cookie-input" placeholder="Paste session 'token' cookie to unlock restricted content (Optional)">
+              <span class="path-status info" id="cookie-status-msg" style="cursor: pointer; white-space: nowrap;" onclick="openCookieModal()">❓ How to get</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions Row -->
+        <div class="gemini-modal-actions">
+          <button class="btn-secondary" onclick="closeSettingsModal()">Cancel</button>
+          <button class="btn-gemini-primary" id="btn-save-settings">Save Settings</button>
         </div>
       </div>
     </div>
