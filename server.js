@@ -588,7 +588,7 @@ async function processQueue() {
 
         const metadataFolder = path.join(settings.sightsPath, cleanZipName);
         if (fs.existsSync(metadataFolder)) {
-          writeQueueMetadata(metadataFolder, item);
+          await writeQueueMetadata(metadataFolder, item);
         }
       } else {
         // Smart Extraction para Skins
@@ -661,7 +661,7 @@ async function processQueue() {
 
         const metadataFolder = path.join(targetBaseDir, createdFolder);
         if (fs.existsSync(metadataFolder)) {
-          writeQueueMetadata(metadataFolder, item);
+          await writeQueueMetadata(metadataFolder, item);
         }
       }
 
@@ -721,8 +721,49 @@ async function processQueue() {
   isProcessingQueue = false;
 }
 
-function writeQueueMetadata(folder, item) {
+async function fetchPostMetadata(lang_group, cookie) {
+  if (!lang_group) return null;
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Content-Type': 'application/x-www-form-urlencoded'
+  };
+  if (cookie) {
+    headers['Cookie'] = `token=${cookie}`;
+  }
   try {
+    const params = new URLSearchParams();
+    params.append('lang_group', lang_group.toString());
+    params.append('language', 'en');
+
+    const response = await fetch('https://live.warthunder.com/api/posts/get/', {
+      method: 'POST',
+      headers,
+      body: params.toString()
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        likes: data.likes || 0,
+        views: data.views || 0,
+        downloads: data.downloads || 0,
+        comments: data.comments || 0,
+        description: data.description || '',
+        images: (data.images || []).map(img => ({ src: (img.mq && img.mq.src) || (img.orig && img.orig.src) || '' })).filter(img => img.src !== ''),
+        isMarketSuitable: data.isMarketSuitable || false,
+        created: data.created || null
+      };
+    }
+  } catch (err) {
+    console.error(`Error fetching WT Live API metadata for lang_group ${lang_group}:`, err);
+  }
+  return null;
+}
+
+async function writeQueueMetadata(folder, item) {
+  try {
+    const settings = loadSettings();
+    const richMeta = await fetchPostMetadata(item.lang_group, settings.cookie);
     const metadata = {
       postId: item.postId ? parseInt(item.postId, 10) : null,
       lang_group: item.lang_group ? parseInt(item.lang_group, 10) : null,
@@ -731,8 +772,23 @@ function writeQueueMetadata(folder, item) {
       title: item.title || null,
       image: item.image || null,
       author: item.author || null,
-      installedAt: Date.now()
+      installedAt: Date.now(),
+      likes: 0,
+      views: 0,
+      downloads: 0,
+      comments: 0,
+      description: '',
+      images: item.image ? [{ src: item.image }] : [],
+      isMarketSuitable: false,
+      created: null,
+      ...(richMeta || {})
     };
+    if (item.title) {
+      metadata.title = item.title;
+    }
+    if (item.image) {
+      metadata.image = item.image;
+    }
     fs.writeFileSync(
       path.join(folder, '.wtlive.json'),
       JSON.stringify(metadata, null, 2),
@@ -845,25 +901,7 @@ app.post('/api/download', async (req, res) => {
       // Write metadata file
       const metadataFolder = path.join(settings.sightsPath, cleanZipName);
       if (fs.existsSync(metadataFolder)) {
-        try {
-          const metadata = {
-            postId: postId ? parseInt(postId, 10) : null,
-            lang_group: lang_group ? parseInt(lang_group, 10) : null,
-            fileName: name,
-            type,
-            title: title || null,
-            image: image || null,
-            author: author || null,
-            installedAt: Date.now()
-          };
-          fs.writeFileSync(
-            path.join(metadataFolder, '.wtlive.json'),
-            JSON.stringify(metadata, null, 2),
-            'utf8'
-          );
-        } catch (err) {
-          console.error('Error writing metadata file:', err);
-        }
+        await writeQueueMetadata(metadataFolder, { postId, lang_group, name, type, title, image, author });
       }
 
       return res.json({
@@ -954,25 +992,7 @@ app.post('/api/download', async (req, res) => {
     // Write metadata file
     const metadataFolder = path.join(targetBaseDir, createdFolder);
     if (fs.existsSync(metadataFolder)) {
-      try {
-        const metadata = {
-          postId: postId ? parseInt(postId, 10) : null,
-          lang_group: lang_group ? parseInt(lang_group, 10) : null,
-          fileName: name,
-          type,
-          title: title || null,
-          image: image || null,
-          author: author || null,
-          installedAt: Date.now()
-        };
-        fs.writeFileSync(
-          path.join(metadataFolder, '.wtlive.json'),
-          JSON.stringify(metadata, null, 2),
-          'utf8'
-        );
-      } catch (err) {
-        console.error('Error writing metadata file:', err);
-      }
+      await writeQueueMetadata(metadataFolder, { postId, lang_group, name, type, title, image, author });
     }
 
     res.json({
@@ -1249,7 +1269,8 @@ app.get('/api/installed/check-updates', async (req, res) => {
                     lang_group: metadata.lang_group,
                     title: metadata.title || file,
                     image: metadata.image || '',
-                    author: metadata.author || null
+                    author: metadata.author || null,
+                    metaPath
                   });
                 }
               } catch (_) {}
@@ -1291,6 +1312,28 @@ app.get('/api/installed/check-updates', async (req, res) => {
       const match = html.match(/lang_group=(\d+)/);
       if (match) {
         const onlineLangGroup = parseInt(match[1], 10);
+        
+        // Fetch latest stats and details from WT Live API
+        const richMeta = await fetchPostMetadata(onlineLangGroup, settings.cookie);
+        if (richMeta) {
+          try {
+            const currentMetadata = JSON.parse(fs.readFileSync(mod.metaPath, 'utf8'));
+            const updatedMetadata = {
+              ...currentMetadata,
+              ...richMeta,
+              lang_group: currentMetadata.lang_group, // Preserve current installed version!
+              installedAt: currentMetadata.installedAt || Date.now()
+            };
+            fs.writeFileSync(mod.metaPath, JSON.stringify(updatedMetadata, null, 2), 'utf8');
+            
+            mod.title = updatedMetadata.title || mod.title;
+            mod.image = updatedMetadata.image || mod.image;
+            mod.author = updatedMetadata.author || mod.author;
+          } catch (e) {
+            console.error(`Error updating local metadata file at ${mod.metaPath}:`, e);
+          }
+        }
+
         if (onlineLangGroup !== mod.lang_group) {
           const downloadUrl = `https://live.warthunder.com/api/post/download/?lang_group=${onlineLangGroup}`;
           
