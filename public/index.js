@@ -1767,6 +1767,33 @@ async function clearQueueHistory() {
   }
 }
 
+function formatSpeed(speedBytesPerSec) {
+  if (!speedBytesPerSec || speedBytesPerSec <= 0) return '0 B/s';
+  if (speedBytesPerSec < 1024) {
+    return `${speedBytesPerSec.toFixed(0)} B/s`;
+  } else if (speedBytesPerSec < 1024 * 1024) {
+    return `${(speedBytesPerSec / 1024).toFixed(1)} KB/s`;
+  } else {
+    return `${(speedBytesPerSec / 1024 / 1024).toFixed(1)} MB/s`;
+  }
+}
+
+function formatSize(bytes) {
+  if (!bytes || bytes <= 0) return '0.0 MB';
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatETA(seconds) {
+  if (seconds === undefined || seconds === null || seconds < 0) return 'ETA: --';
+  if (seconds < 60) {
+    return `ETA: ${seconds}s`;
+  } else {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `ETA: ${mins}m ${secs}s`;
+  }
+}
+
 // Render queue section contents
 function renderQueueLists() {
   const active = state.queueList.active;
@@ -1800,7 +1827,18 @@ function renderQueueLists() {
             <div class="download-progress-bar">
               <div class="download-progress-fill" style="width: ${progressFill}%"></div>
             </div>
-            <span class="download-status-text ${active.status}">${statusText}</span>
+            <div class="download-status-row">
+              <span class="download-status-text ${active.status}">${statusText}</span>
+              ${active.status === 'downloading' && active.speed ? `
+                <div class="download-speed-eta">
+                  <span class="speed">${formatSpeed(active.speed)}</span>
+                  <span class="divider">•</span>
+                  <span class="size">${formatSize(active.downloadedBytes)} / ${formatSize(active.totalBytes)}</span>
+                  <span class="divider">•</span>
+                  <span class="eta">${formatETA(active.eta)}</span>
+                </div>
+              ` : ''}
+            </div>
           </div>
         </div>
         <div class="download-actions">

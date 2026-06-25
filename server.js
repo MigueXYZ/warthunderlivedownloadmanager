@@ -426,9 +426,13 @@ async function downloadFileWithSignal(url, destPath, cookie, signal, onProgress)
       downloadedBytes += value.length;
       bytesDownloadedThisSession += value.length;
 
-      if (totalBytes && onProgress) {
-        const pct = Math.round((downloadedBytes / totalBytes) * 100);
-        onProgress(pct);
+      if (onProgress) {
+        const pct = totalBytes ? Math.round((downloadedBytes / totalBytes) * 100) : 0;
+        const elapsedMs = Date.now() - sessionStartTime;
+        const speed = elapsedMs > 0 ? (bytesDownloadedThisSession / elapsedMs) * 1000 : 0;
+        const remainingBytes = totalBytes ? Math.max(0, totalBytes - downloadedBytes) : 0;
+        const eta = speed > 0 ? Math.round(remainingBytes / speed) : 0;
+        onProgress(pct, downloadedBytes, totalBytes, speed, eta);
       }
 
       if (limitBytesPerSecond < Infinity) {
@@ -503,8 +507,12 @@ async function processQueue() {
         tempZipPath, 
         settings.cookie, 
         item.abortController.signal, 
-        (pct) => {
+        (pct, downloaded, total, speed, eta) => {
           item.progress = pct;
+          item.downloadedBytes = downloaded;
+          item.totalBytes = total;
+          item.speed = speed;
+          item.eta = eta;
         }
       );
 
@@ -1002,7 +1010,11 @@ app.get('/api/queue', (req, res) => {
     status: currentActiveDownload.status,
     progress: currentActiveDownload.progress,
     error: currentActiveDownload.error,
-    addedAt: currentActiveDownload.addedAt
+    addedAt: currentActiveDownload.addedAt,
+    downloadedBytes: currentActiveDownload.downloadedBytes,
+    totalBytes: currentActiveDownload.totalBytes,
+    speed: currentActiveDownload.speed,
+    eta: currentActiveDownload.eta
   } : null;
   const cleanHistory = downloadHistory.map(item => {
     const { abortController, ...rest } = item;
