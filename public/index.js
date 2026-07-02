@@ -167,6 +167,28 @@ function setupEventListeners() {
     }
   });
   
+  // Close modals on Escape keypress
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (elements.lightboxOverlay && !elements.lightboxOverlay.classList.contains('hidden')) {
+        closeLightbox();
+      }
+      if (elements.cookieOverlay && !elements.cookieOverlay.classList.contains('hidden')) {
+        closeCookieModal();
+      }
+      if (elements.settingsOverlay && !elements.settingsOverlay.classList.contains('hidden')) {
+        closeSettingsModal();
+      }
+      const storageOverlay = document.getElementById('storage-overlay');
+      if (storageOverlay && !storageOverlay.classList.contains('hidden')) {
+        closeStorageModal();
+      }
+      if (elements.logsOverlay && !elements.logsOverlay.classList.contains('hidden')) {
+        closeLogsModal();
+      }
+    }
+  });
+  
   // Toggle Content Type (Skins vs Sights)
   elements.contentToggleButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
