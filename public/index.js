@@ -17,7 +17,8 @@ const state = {
   activeVehicle: '',
   hideUniversal: false, // Hide universal skins if searching a specific vehicle
   currentFeedList: [],
-  previousHistoryIds: null
+  previousHistoryIds: null,
+  queueFilter: 'all'
 };
 
 // DOM Elements
@@ -1683,6 +1684,9 @@ window.openCookieModal = openCookieModal;
 window.closeCookieModal = closeCookieModal;
 window.openSettingsModal = openSettingsModal;
 window.closeSettingsModal = closeSettingsModal;
+window.switchQueueFilter = switchQueueFilter;
+window.exportQueueList = exportQueueList;
+window.importQueueList = importQueueList;
 window.copyCookieSnippet = copyCookieSnippet;
 window.pauseDownload = pauseDownload;
 window.resumeDownload = resumeDownload;
@@ -1883,9 +1887,35 @@ function renderQueueLists() {
   const active = state.queueList.active;
   const queue = state.queueList.queue;
   const history = state.queueList.history;
+  const filter = state.queueFilter;
+
+  const activeSection = document.getElementById('queue-active-section');
+  const pendingSection = document.getElementById('queue-pending-section');
+  const historySection = document.getElementById('queue-history-section');
+
+  if (!activeSection || !pendingSection || !historySection) return;
+
+  // Show/hide sections based on filter selection
+  if (filter === 'all') {
+    activeSection.style.display = 'block';
+    pendingSection.style.display = 'block';
+    historySection.style.display = 'block';
+  } else if (filter === 'active') {
+    activeSection.style.display = 'block';
+    pendingSection.style.display = 'none';
+    historySection.style.display = 'none';
+  } else if (filter === 'pending') {
+    activeSection.style.display = 'none';
+    pendingSection.style.display = 'block';
+    historySection.style.display = 'none';
+  } else if (filter === 'completed' || filter === 'failed') {
+    activeSection.style.display = 'none';
+    pendingSection.style.display = 'none';
+    historySection.style.display = 'block';
+  }
 
   // 1. Render Active Download
-  if (active) {
+  if (active && (filter === 'all' || filter === 'active')) {
     const progressFill = active.progress || 0;
     const thumbnail = active.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
     const cleanTitle = active.title || active.name;
@@ -1936,7 +1966,7 @@ function renderQueueLists() {
   }
 
   // 2. Render Pending Queue
-  if (queue && queue.length > 0) {
+  if (queue && queue.length > 0 && (filter === 'all' || filter === 'pending')) {
     elements.pendingQueueContainer.innerHTML = queue.map((item, idx) => {
       const thumbnail = item.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
       const cleanTitle = item.title || item.name;
@@ -1996,8 +2026,15 @@ function renderQueueLists() {
   }
 
   // 3. Render Download History
-  if (history && history.length > 0) {
-    elements.historyQueueContainer.innerHTML = history.map(item => {
+  let filteredHistory = history || [];
+  if (filter === 'completed') {
+    filteredHistory = filteredHistory.filter(item => item.status === 'completed');
+  } else if (filter === 'failed') {
+    filteredHistory = filteredHistory.filter(item => item.status === 'failed' || item.status === 'cancelled');
+  }
+
+  if (filteredHistory && filteredHistory.length > 0 && (filter === 'all' || filter === 'completed' || filter === 'failed')) {
+    elements.historyQueueContainer.innerHTML = filteredHistory.map(item => {
       const thumbnail = item.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
       const cleanTitle = item.title || item.name;
       const authorName = item.author ? item.author.nickname : 'Anonymous';
@@ -2024,7 +2061,86 @@ function renderQueueLists() {
       `;
     }).join('');
   } else {
-    elements.historyQueueContainer.innerHTML = `<div class="no-downloads-msg">No download history.</div>`;
+    let noHistoryMsg = 'No download history.';
+    if (filter === 'completed') noHistoryMsg = 'No completed downloads found.';
+    if (filter === 'failed') noHistoryMsg = 'No failed or cancelled downloads found.';
+    elements.historyQueueContainer.innerHTML = `<div class="no-downloads-msg">${noHistoryMsg}</div>`;
+  }
+}
+
+// Switch status filter for downloads queue
+function switchQueueFilter(filter, btn) {
+  state.queueFilter = filter;
+  
+  // Update toggle button states
+  const buttons = document.querySelectorAll('#queue-filter-toggle .toggle-btn');
+  buttons.forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  renderQueueLists();
+}
+
+// Export the download lists as JSON
+async function exportQueueList() {
+  try {
+    const res = await fetch('/api/queue/export');
+    const data = await res.json();
+    
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href",     dataStr);
+    downloadAnchor.setAttribute("download", "wt-downloads-backup.json");
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast('Download list exported successfully!', 'success');
+  } catch (e) {
+    showToast('Failed to export download list.', 'error');
+  }
+}
+
+// Import download list from JSON backup
+async function importQueueList(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || (!data.queue && !data.history)) {
+        showToast('Invalid backup file format.', 'error');
+        return;
+      }
+
+      const importedQueue = [];
+      if (Array.isArray(data.queue)) {
+        importedQueue.push(...data.queue);
+      }
+      if (Array.isArray(data.history)) {
+        importedQueue.push(...data.history);
+      }
+
+      const res = await fetch('/api/queue/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queue: importedQueue })
+      });
+      const resData = await res.json();
+      
+      if (resData.success) {
+        showToast(resData.message, 'success');
+        pollQueue();
+      } else {
+        showToast(resData.error || 'Failed to import list.', 'error');
+      }
+    } catch (err) {
+      showToast('Error parsing file JSON.', 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
   }
 }
 

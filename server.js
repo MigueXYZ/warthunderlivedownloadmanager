@@ -1149,6 +1149,78 @@ app.post('/api/queue/clear-history', (req, res) => {
   res.json({ success: true, message: 'Download history cleared.' });
 });
 
+// API: Export download list
+app.get('/api/queue/export', (req, res) => {
+  const cleanQueue = downloadQueue.map(item => ({
+    postId: item.postId,
+    name: item.name,
+    title: item.title,
+    url: item.url,
+    type: item.type,
+    image: item.image,
+    author: item.author,
+    lang_group: item.lang_group
+  }));
+  const cleanHistory = downloadHistory.map(item => ({
+    postId: item.postId,
+    name: item.name,
+    title: item.title,
+    url: item.url,
+    type: item.type,
+    image: item.image,
+    author: item.author,
+    lang_group: item.lang_group,
+    status: item.status,
+    error: item.error,
+    completedAt: item.completedAt
+  }));
+  res.json({ queue: cleanQueue, history: cleanHistory });
+});
+
+// API: Import download list
+app.post('/api/queue/import', (req, res) => {
+  const { queue } = req.body;
+  if (!queue || !Array.isArray(queue)) {
+    return res.status(400).json({ error: 'Invalid import format. Expected { queue: [...] }' });
+  }
+
+  let importedCount = 0;
+  for (const item of queue) {
+    if (!item.url || !item.name) continue;
+    
+    // Avoid duplicates
+    const isActive = currentActiveDownload && currentActiveDownload.postId === item.postId;
+    const isQueued = downloadQueue.some(x => x.postId === item.postId);
+    if (isActive || isQueued) continue;
+
+    const newItem = {
+      id: `dl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      postId: item.postId,
+      name: item.name,
+      title: item.title || item.name,
+      url: item.url,
+      type: item.type || 'camouflage',
+      image: item.image,
+      author: item.author,
+      lang_group: item.lang_group,
+      status: 'pending',
+      progress: 0,
+      retries: 0,
+      maxRetries: 3,
+      queuedAt: Date.now()
+    };
+
+    downloadQueue.push(newItem);
+    importedCount++;
+  }
+
+  if (importedCount > 0) {
+    processQueue();
+  }
+
+  res.json({ success: true, message: `Successfully imported ${importedCount} items to the download queue.` });
+});
+
 // API: Reorder queue item (Priority ordering)
 app.post('/api/queue/reorder', (req, res) => {
   const { id, action } = req.body; // action: 'up' | 'down' | 'top'

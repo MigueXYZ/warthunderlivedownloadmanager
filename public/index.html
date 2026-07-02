@@ -199,14 +199,31 @@
 
       <!-- Queue Tab -->
       <section class="tab-content" id="tab-queue">
-        <div class="library-header">
+        <div class="library-header" style="margin-bottom: 16px;">
           <h2>Downloads & Queue</h2>
-          <button class="btn-secondary" onclick="clearQueueHistory()">🧹 Clear History</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-secondary" onclick="document.getElementById('import-file-input').click()">📋 Import List</button>
+            <button class="btn-secondary" onclick="exportQueueList()">📥 Export List</button>
+            <button class="btn-secondary" onclick="clearQueueHistory()">🧹 Clear History</button>
+            <input type="file" id="import-file-input" style="display: none;" onchange="importQueueList(event)">
+          </div>
+        </div>
+
+        <!-- Filter Buttons row -->
+        <div class="filter-panel" style="margin-bottom: 20px; padding: 12px 20px; display: flex; gap: 8px; justify-content: flex-start; align-items: center; border-radius: var(--radius-md);">
+          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-right: 8px; letter-spacing: 0.5px;">Filter Status:</span>
+          <div class="toggle-buttons" id="queue-filter-toggle">
+            <button class="toggle-btn active" onclick="switchQueueFilter('all', this)">All</button>
+            <button class="toggle-btn" onclick="switchQueueFilter('active', this)">Active</button>
+            <button class="toggle-btn" onclick="switchQueueFilter('pending', this)">Pending</button>
+            <button class="toggle-btn" onclick="switchQueueFilter('completed', this)">Completed</button>
+            <button class="toggle-btn" onclick="switchQueueFilter('failed', this)">Failed</button>
+          </div>
         </div>
 
         <div class="queue-container">
           <!-- Active Download -->
-          <div class="queue-section">
+          <div class="queue-section" id="queue-active-section">
             <h3>Active Download</h3>
             <div id="active-download-container">
               <div class="no-downloads-msg">No active downloads.</div>
@@ -214,7 +231,7 @@
           </div>
 
           <!-- Pending Queue -->
-          <div class="queue-section">
+          <div class="queue-section" id="queue-pending-section">
             <h3>Pending Queue</h3>
             <div id="pending-queue-container">
               <div class="no-downloads-msg">No pending items in queue.</div>
@@ -222,7 +239,7 @@
           </div>
 
           <!-- Download History -->
-          <div class="queue-section">
+          <div class="queue-section" id="queue-history-section">
             <h3>Download History</h3>
             <div id="history-queue-container">
               <div class="no-downloads-msg">No download history.</div>
