@@ -476,6 +476,18 @@
               <span class="switch-slider" style="position: absolute; cursor: pointer; inset: 0; background-color: var(--border-color-hover); transition: .3s; border-radius: 24px;"></span>
             </label>
           </div>
+        <!-- Section: File Integrity -->
+        <div class="settings-section">
+          <h3>🔒 File Verification</h3>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <div>
+              <span style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 2px;">Enable SHA-256 generation and directory integrity checks for downloaded ZIP packages.</span>
+            </div>
+            <label class="switch-container" style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0;">
+              <input type="checkbox" id="verify-integrity-toggle" style="opacity: 0; width: 0; height: 0;">
+              <span class="switch-slider" style="position: absolute; cursor: pointer; inset: 0; background-color: var(--border-color-hover); transition: .3s; border-radius: 24px;"></span>
+            </label>
+          </div>
         </div>
 
         <!-- Actions Row -->

@@ -494,6 +494,10 @@ async function loadSettings() {
     if (notifToggle) {
       notifToggle.checked = localStorage.getItem('enableNotifications') !== 'false';
     }
+    const integrityToggle = document.getElementById('verify-integrity-toggle');
+    if (integrityToggle) {
+      integrityToggle.checked = data.verifyIntegrity !== false;
+    }
   } catch (e) {
     showToast('Failed to load settings from server', 'error');
   }
@@ -508,12 +512,13 @@ async function saveSettings() {
   const whitelistTags = elements.whitelistInput.value.trim();
   const limitPerDownload = parseInt(elements.limitDownloadInput.value, 10) || 0;
   const limitGlobal = parseInt(elements.limitGlobalInput.value, 10) || 0;
+  const verifyIntegrity = document.getElementById('verify-integrity-toggle') ? document.getElementById('verify-integrity-toggle').checked : true;
   
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wtPath, sightsPath, cookie, blacklistTags, whitelistTags, limitPerDownload, limitGlobal })
+      body: JSON.stringify({ wtPath, sightsPath, cookie, blacklistTags, whitelistTags, limitPerDownload, limitGlobal, verifyIntegrity })
     });
     
     const data = await res.json();

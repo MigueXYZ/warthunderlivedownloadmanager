@@ -4,6 +4,18 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const AdmZip = require('adm-zip');
+const crypto = require('crypto');
+
+// Calculate SHA-256 hash of a file
+function calculateSHA256(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', data => hash.update(data));
+    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('error', err => reject(err));
+  });
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,7 +52,7 @@ const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 
 // Helper to load settings
 function loadSettings() {
-  let settings = { wtPath: '', sightsPath: '', cookie: '', blacklistTags: '', whitelistTags: '', limitPerDownload: 0, limitGlobal: 0 };
+  let settings = { wtPath: '', sightsPath: '', cookie: '', blacklistTags: '', whitelistTags: '', limitPerDownload: 0, limitGlobal: 0, verifyIntegrity: true };
   if (fs.existsSync(SETTINGS_FILE)) {
     try {
       settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
@@ -541,6 +553,24 @@ async function processQueue() {
 
       if (item.status === 'cancelled') {
         throw new Error('Download cancelled by user.');
+      }
+
+      // Check integrity if enabled
+      if (settings.verifyIntegrity !== false) {
+        logActivity(`[Queue] Verifying file integrity for: ${item.title}`, 'INFO');
+        try {
+          const hash = await calculateSHA256(tempZipPath);
+          logActivity(`[Queue] SHA-256 Checksum: ${hash} (${item.title})`, 'INFO');
+          
+          // Verify zip header integrity
+          const testZip = new AdmZip(tempZipPath);
+          const entries = testZip.getEntries();
+          if (!entries || entries.length === 0) {
+            throw new Error('ZIP file directory structure is empty or corrupt.');
+          }
+        } catch (verifErr) {
+          throw new Error(`File integrity check failed: ${verifErr.message}`);
+        }
       }
 
       item.status = 'extracting';

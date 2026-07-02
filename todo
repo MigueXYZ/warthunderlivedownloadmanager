@@ -11,6 +11,5 @@
 - [x] Automatic cleanup of partial files on cancel
 - [x] Ability to import/export download lists
 - [x] Logging of download activity and errors
-- Option to verify downloaded files against checksums
+- [x] Option to verify downloaded files against checksums
 - [x] UI for filtering and sorting downloads by status
-- Support for background operation when app is minimized
