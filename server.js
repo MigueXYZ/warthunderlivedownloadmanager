@@ -8,6 +8,28 @@ const AdmZip = require('adm-zip');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const logFilePath = path.join(__dirname, 'app.log');
+
+// Logging helper to write to both console and log file
+function logActivity(message, level = 'INFO') {
+  const timestamp = new Date().toLocaleString();
+  const logLine = `[${timestamp}] [${level}] ${message}\n`;
+  
+  if (level === 'ERROR') {
+    console.error(message);
+  } else if (level === 'WARN') {
+    console.warn(message);
+  } else {
+    console.log(message);
+  }
+
+  try {
+    fs.appendFileSync(logFilePath, logLine, 'utf8');
+  } catch (err) {
+    console.error('Failed to append to app.log:', err);
+  }
+}
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -501,7 +523,7 @@ async function processQueue() {
         throw new Error('User Sights path is not set or invalid.');
       }
 
-      console.log(`[Queue] Starting download for: ${item.title}`);
+      logActivity(`[Queue] Starting download for: ${item.title}`, 'INFO');
       
       await downloadFileWithSignal(
         item.url, 
@@ -523,7 +545,7 @@ async function processQueue() {
 
       item.status = 'extracting';
       item.progress = 100;
-      console.log(`[Queue] Extracting zip for: ${item.title}`);
+      logActivity(`[Queue] Extracting zip for: ${item.title}`, 'INFO');
 
       // Incrementar contagem de download no WT Live
       if (item.lang_group) {
@@ -670,47 +692,46 @@ async function processQueue() {
 
       item.status = 'completed';
       item.progress = 100;
-      item.completedAt = Date.now();
-      console.log(`[Queue] Completed installation for: ${item.title}`);
+      item.completedAt = Date.now();        
+      logActivity(`[Queue] Completed installation for: ${item.title}`, 'INFO');
 
-    } catch (err) {
-      const isRetryable = item.status !== 'cancelled' && item.status !== 'paused';
-      
-      if (isRetryable && (item.retries || 0) < (item.maxRetries || 3)) {
-        item.retries = (item.retries || 0) + 1;
-        const backoffDelay = Math.pow(2, item.retries) * 1000;
-        item.retryAfter = Date.now() + backoffDelay;
-        item.status = 'pending';
-        console.log(`[Queue] Download failed for "${item.title}". Retrying in ${backoffDelay}ms (Attempt ${item.retries}/${item.maxRetries}). Error: ${err.message}`);
-      } else {
-        if (fs.existsSync(tempZipPath)) {
-          if (item.status !== 'paused') {
-            try { fs.unlinkSync(tempZipPath); } catch (_) {}
-          }
-        }
-
-        if (createdExtractionFolder && fs.existsSync(createdExtractionFolder)) {
-          if (item.status !== 'paused') {
-            try {
-              fs.rmSync(createdExtractionFolder, { recursive: true, force: true });
-              console.log(`[Queue] Cleaned up partial folder on failure/cancel: ${createdExtractionFolder}`);
-            } catch (cleanupErr) {
-              console.error(`[Queue] Failed to clean up folder ${createdExtractionFolder}:`, cleanupErr);
+      } catch (err) {
+        const isRetryable = item.status !== 'cancelled' && item.status !== 'paused';
+        
+        if (isRetryable && (item.retries || 0) < (item.maxRetries || 3)) {
+          item.retries = (item.retries || 0) + 1;
+          const backoffDelay = Math.pow(2, item.retries) * 1000;
+          item.retryAfter = Date.now() + backoffDelay;
+          item.status = 'pending';
+          logActivity(`[Queue] Download failed for "${item.title}". Retrying in ${backoffDelay}ms (Attempt ${item.retries}/${item.maxRetries}). Error: ${err.message}`, 'WARN');
+        } else {
+          if (fs.existsSync(tempZipPath)) {
+            if (item.status !== 'paused') {
+              try { fs.unlinkSync(tempZipPath); } catch (_) {}
             }
           }
-        }
 
-        if (item.status === 'cancelled') {
-          console.log(`[Queue] Cancelled: ${item.title}`);
-        } else if (item.status === 'paused') {
-          console.log(`[Queue] Paused: ${item.title}`);
-        } else {
-          item.status = 'failed';
-          item.error = err.message;
-          console.error(`[Queue] Failed installation for: ${item.title} after maximum retries.`, err);
-        }
+          if (createdExtractionFolder && fs.existsSync(createdExtractionFolder)) {
+            if (item.status !== 'paused') {
+              try {
+                fs.rmSync(createdExtractionFolder, { recursive: true, force: true });
+                logActivity(`[Queue] Cleaned up partial folder on failure/cancel: ${createdExtractionFolder}`, 'INFO');
+              } catch (cleanupErr) {
+                logActivity(`[Queue] Failed to clean up folder ${createdExtractionFolder}: ${cleanupErr.message}`, 'ERROR');
+              }
+            }
+          }
+
+          if (item.status === 'cancelled') {
+            logActivity(`[Queue] Cancelled: ${item.title}`, 'INFO');
+          } else if (item.status === 'paused') {
+            logActivity(`[Queue] Paused: ${item.title}`, 'INFO');
+          } else {
+            item.status = 'failed';
+            item.error = err.message;
+            logActivity(`[Queue] Failed installation for: ${item.title} after maximum retries. Error: ${err.message}`, 'ERROR');
+          } }
         item.completedAt = Date.now();
-      }
     } finally {
       delete item.abortController;
       
@@ -1219,6 +1240,42 @@ app.post('/api/queue/import', (req, res) => {
   }
 
   res.json({ success: true, message: `Successfully imported ${importedCount} items to the download queue.` });
+});
+
+// API: Get recent activity logs
+app.get('/api/logs', (req, res) => {
+  if (!fs.existsSync(logFilePath)) {
+    return res.json({ logs: '[System] Log file does not exist yet. Perform some activity to generate logs.' });
+  }
+
+  try {
+    const data = fs.readFileSync(logFilePath, 'utf8');
+    const lines = data.split('\n');
+    // Keep last 300 lines
+    const lastLines = lines.slice(-300).join('\n');
+    res.json({ logs: lastLines });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read logs: ' + err.message });
+  }
+});
+
+// API: Clear logs
+app.post('/api/logs/clear', (req, res) => {
+  try {
+    fs.writeFileSync(logFilePath, '', 'utf8');
+    logActivity('Logs cleared by user.', 'INFO');
+    res.json({ success: true, message: 'Log file cleared.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to clear logs: ' + err.message });
+  }
+});
+
+// API: Download log file
+app.get('/api/logs/download', (req, res) => {
+  if (!fs.existsSync(logFilePath)) {
+    return res.status(404).send('Log file does not exist.');
+  }
+  res.download(logFilePath, 'wt-live-manager.log');
 });
 
 // API: Reorder queue item (Priority ordering)
@@ -2004,5 +2061,5 @@ app.get('/api/telemetry', async (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  logActivity(`Server running at http://localhost:${PORT}`, 'INFO');
 });

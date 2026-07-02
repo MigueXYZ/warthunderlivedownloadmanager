@@ -480,8 +480,42 @@
 
         <!-- Actions Row -->
         <div class="gemini-modal-actions">
+          <button class="btn-secondary" onclick="openLogsModal()" style="margin-right: auto; display: flex; align-items: center; gap: 8px;">
+            <span>📜</span> View Activity Logs
+          </button>
           <button class="btn-secondary" onclick="closeSettingsModal()">Cancel</button>
           <button class="btn-gemini-primary" id="btn-save-settings">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log Viewer Modal -->
+  <div class="overlay hidden" id="logs-overlay" onclick="closeLogsModal(event)">
+    <div class="overlay-card logs-card" onclick="event.stopPropagation()">
+      <div class="gemini-gradient-bar"></div>
+      <div class="storage-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 20px;">📜</span>
+          <h2 style="font-family: var(--font-family-display); font-weight: 700;">System Activity Logs</h2>
+        </div>
+        <button class="close-modal-btn" onclick="closeLogsModal()">&times;</button>
+      </div>
+      <div class="storage-modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; width: 100%;">
+        <div class="logs-terminal">
+          <pre id="logs-console">⏳ Loading activity logs...</pre>
+        </div>
+        <div class="gemini-modal-actions" style="border-top: none; padding-top: 0; margin-top: 0; width: 100%; display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn-secondary" onclick="refreshLogs()" style="display: flex; align-items: center; gap: 6px;">
+            <span>🔄</span> Refresh
+          </button>
+          <button class="btn-secondary" onclick="clearLogs()" style="display: flex; align-items: center; gap: 6px;">
+            <span>🗑️</span> Clear Logs
+          </button>
+          <a href="/api/logs/download" target="_blank" class="btn-secondary" style="text-decoration: none; display: flex; align-items: center; gap: 6px; padding: 10px 16px;">
+            <span>📥</span> Download Log File
+          </a>
+          <button class="btn-gemini-primary" onclick="closeLogsModal()">Close</button>
         </div>
       </div>
     </div>

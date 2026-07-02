@@ -93,7 +93,9 @@ const elements = {
   appUpdateLink: document.getElementById('app-update-link'),
   appVersionLabel: document.getElementById('app-version-label'),
   cookieOverlay: document.getElementById('cookie-overlay'),
-  settingsOverlay: document.getElementById('settings-overlay')
+  settingsOverlay: document.getElementById('settings-overlay'),
+  logsOverlay: document.getElementById('logs-overlay'),
+  logsConsole: document.getElementById('logs-console')
 };
 
 // Initial Setup
@@ -2757,3 +2759,66 @@ function showSystemNotification(item) {
     }
   }
 }
+
+// Open Activity Logs Modal and fetch content
+async function openLogsModal() {
+  if (elements.logsOverlay) {
+    elements.logsOverlay.classList.remove('hidden');
+    await refreshLogs();
+  }
+}
+
+// Close Activity Logs Modal
+function closeLogsModal(event) {
+  if (event) {
+    if (event.target !== document.getElementById('logs-overlay')) return;
+  }
+  if (elements.logsOverlay) {
+    elements.logsOverlay.classList.add('hidden');
+  }
+}
+
+// Refresh log terminal container contents
+async function refreshLogs() {
+  if (!elements.logsConsole) return;
+  elements.logsConsole.textContent = '⏳ Fetching latest activity logs...';
+  try {
+    const res = await fetch('/api/logs');
+    const data = await res.json();
+    if (data.error) {
+      elements.logsConsole.textContent = `Error: ${data.error}`;
+    } else {
+      elements.logsConsole.textContent = data.logs || '[System] No logs available.';
+      // Scroll to bottom of terminal
+      const terminal = document.querySelector('.logs-terminal');
+      if (terminal) {
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+    }
+  } catch (err) {
+    elements.logsConsole.textContent = 'Failed to fetch logs from server.';
+  }
+}
+
+// Clear backend logs file
+async function clearLogs() {
+  if (!confirm('Are you sure you want to clear all activity logs? This action cannot be undone.')) return;
+  try {
+    const res = await fetch('/api/logs/clear', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Logs cleared successfully.', 'success');
+      await refreshLogs();
+    } else {
+      showToast(data.error || 'Failed to clear logs.', 'error');
+    }
+  } catch (e) {
+    showToast('Failed to clear logs.', 'error');
+  }
+}
+
+// Export to window object
+window.openLogsModal = openLogsModal;
+window.closeLogsModal = closeLogsModal;
+window.refreshLogs = refreshLogs;
+window.clearLogs = clearLogs;
