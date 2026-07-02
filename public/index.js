@@ -16,7 +16,8 @@ const state = {
   telemetryActive: false,
   activeVehicle: '',
   hideUniversal: false, // Hide universal skins if searching a specific vehicle
-  currentFeedList: []
+  currentFeedList: [],
+  previousHistoryIds: null
 };
 
 // DOM Elements
@@ -115,6 +116,34 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
+  // Notifications toggle listener
+  const notifToggle = document.getElementById('notifications-toggle');
+  if (notifToggle) {
+    notifToggle.addEventListener('change', async () => {
+      if (notifToggle.checked) {
+        if ('Notification' in window) {
+          const permission = await Notification.requestPermission();
+          if (permission !== 'granted') {
+            showToast('Desktop notification permission denied.', 'warning');
+            notifToggle.checked = false;
+            localStorage.setItem('enableNotifications', 'false');
+          } else {
+            showToast('Notifications enabled!', 'success');
+            localStorage.setItem('enableNotifications', 'true');
+            playNotificationSound(true);
+          }
+        } else {
+          showToast('Desktop notifications not supported in this browser.', 'warning');
+          notifToggle.checked = false;
+          localStorage.setItem('enableNotifications', 'false');
+        }
+      } else {
+        localStorage.setItem('enableNotifications', 'false');
+        showToast('Notifications disabled.', 'info');
+      }
+    });
+  }
+
   // Save Settings
   elements.btnSaveSettings.addEventListener('click', saveSettings);
   
@@ -434,6 +463,11 @@ async function loadSettings() {
       elements.limitGlobalInput.value = data.limitGlobal;
     } else {
       elements.limitGlobalInput.value = '';
+    }
+
+    const notifToggle = document.getElementById('notifications-toggle');
+    if (notifToggle) {
+      notifToggle.checked = localStorage.getItem('enableNotifications') !== 'false';
     }
   } catch (e) {
     showToast('Failed to load settings from server', 'error');
@@ -2011,6 +2045,25 @@ async function pollQueue() {
       elements.countQueue.classList.add('hidden');
     }
     
+    // Check for completion/failure transitions in history
+    if (data.history) {
+      const currentIds = data.history.map(item => item.id);
+      if (state.previousHistoryIds === null) {
+        // Initial population
+        state.previousHistoryIds = new Set(currentIds);
+      } else {
+        // Look for new history items
+        for (const item of data.history) {
+          if (!state.previousHistoryIds.has(item.id)) {
+            state.previousHistoryIds.add(item.id);
+            if (item.status === 'completed' || item.status === 'failed') {
+              showSystemNotification(item);
+            }
+          }
+        }
+      }
+    }
+    
     // If active tab is queue, render the lists
     if (state.activeTab === 'queue') {
       renderQueueLists();
@@ -2506,3 +2559,85 @@ window.closeModDetailsModal = function(event) {
   if (event && event.target !== event.currentTarget) return;
   document.getElementById('mod-details-overlay').classList.add('hidden');
 };
+
+// Play audio notification chime using Web Audio API
+function playNotificationSound(isSuccess) {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    if (isSuccess) {
+      // Success chime: C5 (523.25 Hz) then E5 (659.25 Hz)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(523.25, ctx.currentTime);
+      gain1.gain.setValueAtTime(0, ctx.currentTime);
+      gain1.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
+      gain1.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15);
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.15);
+      
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12);
+      gain2.gain.setValueAtTime(0, ctx.currentTime + 0.12);
+      gain2.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.17);
+      gain2.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.35);
+      osc2.start(ctx.currentTime + 0.12);
+      osc2.stop(ctx.currentTime + 0.35);
+    } else {
+      // Error chime: low sawtooth-triangle warning
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc1.type = 'sawtooth';
+      osc2.type = 'triangle';
+      osc1.frequency.setValueAtTime(220, ctx.currentTime);
+      osc2.frequency.setValueAtTime(277.18, ctx.currentTime);
+      
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc1.start(ctx.currentTime);
+      osc2.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.4);
+      osc2.stop(ctx.currentTime + 0.4);
+    }
+  } catch (e) {
+    console.error('Failed to play notification chime:', e);
+  }
+}
+
+// Show HTML5 native desktop notification
+function showSystemNotification(item) {
+  const enabled = localStorage.getItem('enableNotifications') !== 'false';
+  const isSuccess = item.status === 'completed';
+  
+  if (enabled) {
+    playNotificationSound(isSuccess);
+  }
+  
+  if (enabled && 'Notification' in window && Notification.permission === 'granted') {
+    const title = isSuccess ? '✅ Download Completed' : '❌ Download Failed';
+    const body = isSuccess 
+      ? `"${item.title}" has been successfully installed in your library.`
+      : `Failed to install "${item.title}". Error: ${item.error || 'Unknown error'}`;
+    
+    try {
+      new Notification(title, { body: body });
+    } catch (e) {
+      console.error('Failed to trigger native Notification:', e);
+    }
+  }
+}

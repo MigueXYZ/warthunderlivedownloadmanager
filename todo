@@ -4,11 +4,11 @@
 - [x] Bandwidth limit per download and global cap
 - [x] Clear progress and status indicators for each item
 - [x] Make a settings modal
-- Integration with War Thunder live update metadata
-- Notification on completion or errors
-- Configurable download folder and temp storage
-- Automatic cleanup of partial files on cancel
-- Ability to import/export download lists
+- [x] Integration with War Thunder live update metadata
+- [x] Notification on completion or errors
+- [ ] Configurable download folder and temp storage
+- [x] Automatic cleanup of partial files on cancel
+- [ ] Ability to import/export download lists
 - Logging of download activity and errors
 - Option to verify downloaded files against checksums
 - UI for filtering and sorting downloads by status

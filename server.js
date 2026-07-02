@@ -491,6 +491,7 @@ async function processQueue() {
     const tempZipPath = path.join(tempDir, safeName);
     
     item.abortController = new AbortController();
+    let createdExtractionFolder = null;
 
     try {
       if (item.type === 'camouflage' && (!settings.wtPath || !fs.existsSync(settings.wtPath))) {
@@ -571,6 +572,7 @@ async function processQueue() {
         
         const cleanZipName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
         const modSightsDir = path.join(settings.sightsPath, cleanZipName, 'all_tanks');
+        createdExtractionFolder = path.join(settings.sightsPath, cleanZipName);
         
         if (!fs.existsSync(modSightsDir)) {
           fs.mkdirSync(modSightsDir, { recursive: true });
@@ -660,6 +662,7 @@ async function processQueue() {
         fs.unlinkSync(tempZipPath);
 
         const metadataFolder = path.join(targetBaseDir, createdFolder);
+        createdExtractionFolder = metadataFolder;
         if (fs.existsSync(metadataFolder)) {
           await writeQueueMetadata(metadataFolder, item);
         }
@@ -683,6 +686,17 @@ async function processQueue() {
         if (fs.existsSync(tempZipPath)) {
           if (item.status !== 'paused') {
             try { fs.unlinkSync(tempZipPath); } catch (_) {}
+          }
+        }
+
+        if (createdExtractionFolder && fs.existsSync(createdExtractionFolder)) {
+          if (item.status !== 'paused') {
+            try {
+              fs.rmSync(createdExtractionFolder, { recursive: true, force: true });
+              console.log(`[Queue] Cleaned up partial folder on failure/cancel: ${createdExtractionFolder}`);
+            } catch (cleanupErr) {
+              console.error(`[Queue] Failed to clean up folder ${createdExtractionFolder}:`, cleanupErr);
+            }
           }
         }
 
