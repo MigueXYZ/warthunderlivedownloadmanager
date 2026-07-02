@@ -2143,8 +2143,6 @@ async function importQueueList(event) {
   reader.readAsText(file);
   event.target.value = '';
 }
-  }
-}
 
 // Poll download queue API
 async function pollQueue() {
