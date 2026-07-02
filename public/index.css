@@ -1743,6 +1743,9 @@ select:focus {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-hover);
   animation: modal-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0 !important;
+  align-items: stretch !important;
+  text-align: left !important;
 }
 
 @keyframes modal-enter {
