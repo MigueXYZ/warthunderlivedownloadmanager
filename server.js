@@ -237,7 +237,7 @@ app.post('/api/post-details', async (req, res) => {
 });
 
 // API: Download resource directly (Queue addition)
-app.post('/api/download', (req, res) => {
+app.post(['/api/download', '/api/queue/add'], (req, res) => {
   const { url, type, name, postId, title, image, author, lang_group } = req.body;
   const settings = loadSettings();
 
