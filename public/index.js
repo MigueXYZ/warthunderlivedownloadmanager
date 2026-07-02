@@ -18,7 +18,8 @@ const state = {
   hideUniversal: false, // Hide universal skins if searching a specific vehicle
   currentFeedList: [],
   previousHistoryIds: null,
-  queueFilter: 'all'
+  queueFilter: 'all',
+  filterLibraryByActiveVehicle: false
 };
 
 // DOM Elements
@@ -97,7 +98,10 @@ const elements = {
   cookieOverlay: document.getElementById('cookie-overlay'),
   settingsOverlay: document.getElementById('settings-overlay'),
   logsOverlay: document.getElementById('logs-overlay'),
-  logsConsole: document.getElementById('logs-console')
+  logsConsole: document.getElementById('logs-console'),
+  chkLibraryActiveVehicle: document.getElementById('chk-library-active-vehicle'),
+  libraryActiveFilterContainer: document.getElementById('library-active-filter-container'),
+  libraryActiveVehicleLabel: document.getElementById('library-active-vehicle-label')
 };
 
 // Initial Setup
@@ -1109,12 +1113,27 @@ async function toggleModActive(type, name) {
 
 // Render Library Tab Lists using Steam Library Style Visual Cards
 function renderLibraryLists() {
+  let skins = state.installedList.skins || [];
+  let sights = state.installedList.sights || [];
+
+  if (state.filterLibraryByActiveVehicle && state.activeVehicle) {
+    skins = skins.filter(skin => doesSkinMatchVehicle(skin, state.activeVehicle));
+    sights = sights.filter(sight => {
+      const cleanName = sight.name.toLowerCase();
+      const cleanVehicle = state.activeVehicle.toLowerCase();
+      return cleanName.includes(cleanVehicle) || cleanVehicle.includes(cleanName);
+    });
+  }
+
   // Skins List
   elements.skinsList.innerHTML = '';
-  if (state.installedList.skins.length === 0) {
-    elements.skinsList.innerHTML = '<div class="info-text" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; width: 100%;">No custom skins installed.</div>';
+  if (skins.length === 0) {
+    const emptyMsg = state.filterLibraryByActiveVehicle && state.activeVehicle
+      ? `No custom skins installed for ${formatVehicleDisplayName(state.activeVehicle)}.`
+      : 'No custom skins installed.';
+    elements.skinsList.innerHTML = `<div class="info-text" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; width: 100%;">${emptyMsg}</div>`;
   } else {
-    state.installedList.skins.forEach(skin => {
+    skins.forEach(skin => {
       const metadata = skin.metadata || {};
       const displayTitle = metadata.title || cleanFilename(metadata.fileName || skin.name);
       const imageUrl = metadata.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
@@ -1210,10 +1229,13 @@ function renderLibraryLists() {
   
   // Sights List
   elements.sightsList.innerHTML = '';
-  if (state.installedList.sights.length === 0) {
-    elements.sightsList.innerHTML = '<div class="info-text" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; width: 100%;">No custom sights installed.</div>';
+  if (sights.length === 0) {
+    const emptyMsg = state.filterLibraryByActiveVehicle && state.activeVehicle
+      ? `No custom sights installed for ${formatVehicleDisplayName(state.activeVehicle)}.`
+      : 'No custom sights installed.';
+    elements.sightsList.innerHTML = `<div class="info-text" style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; width: 100%;">${emptyMsg}</div>`;
   } else {
-    state.installedList.sights.forEach(sight => {
+    sights.forEach(sight => {
       const metadata = sight.metadata || {};
       const displayTitle = metadata.title || cleanFilename(metadata.fileName || sight.name);
       const imageUrl = metadata.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
@@ -1492,6 +1514,13 @@ async function pollTelemetry() {
       elements.telemetryContent.classList.remove('hidden');
       document.getElementById('telemetry-footer-text').innerText = 'In-match tracking active';
 
+      if (elements.libraryActiveFilterContainer) {
+        elements.libraryActiveFilterContainer.classList.remove('hidden');
+      }
+      if (elements.libraryActiveVehicleLabel) {
+        elements.libraryActiveVehicleLabel.innerText = formatVehicleDisplayName(cleanedVehicle);
+      }
+
       // Check for matching skins in state.installedList.skins
       const matchingSkins = (state.installedList.skins || []).filter(skin => 
         doesSkinMatchVehicle(skin, cleanedVehicle)
@@ -1512,6 +1541,17 @@ async function pollTelemetry() {
       elements.telemetryContent.classList.add('hidden');
       document.getElementById('telemetry-footer-text').innerText = 'Launch WT & enter test flight/match';
       elements.telemetrySkinsAlert.classList.add('hidden');
+
+      if (elements.libraryActiveFilterContainer) {
+        elements.libraryActiveFilterContainer.classList.add('hidden');
+      }
+      if (elements.chkLibraryActiveVehicle) {
+        elements.chkLibraryActiveVehicle.checked = false;
+      }
+      if (state.filterLibraryByActiveVehicle) {
+        state.filterLibraryByActiveVehicle = false;
+        renderLibraryLists();
+      }
     }
   } catch (e) {
     // Silently ignore telemetry polling errors
@@ -1740,6 +1780,10 @@ window.importQueueList = importQueueList;
 window.copyCookieSnippet = copyCookieSnippet;
 window.pauseDownload = pauseDownload;
 window.resumeDownload = resumeDownload;
+window.toggleLibraryActiveVehicleFilter = function(chk) {
+  state.filterLibraryByActiveVehicle = chk.checked;
+  renderLibraryLists();
+};
 
 // ==========================================
 // DOWNLOAD QUEUE HANDLERS & RENDERING
