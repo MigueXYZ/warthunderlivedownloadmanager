@@ -50,9 +50,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Path to save settings
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 
-// Helper to load settings
 function loadSettings() {
-  let settings = { wtPath: '', sightsPath: '', cookie: '', blacklistTags: '', whitelistTags: '', limitPerDownload: 0, limitGlobal: 0, verifyIntegrity: true };
+  let settings = { wtPath: '', sightsPath: '', cookie: '', blacklistTags: '', whitelistTags: '', limitPerDownload: 0, limitGlobal: 0, verifyIntegrity: true, tempPath: '' };
   if (fs.existsSync(SETTINGS_FILE)) {
     try {
       settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
@@ -67,6 +66,9 @@ function loadSettings() {
   }
   if (!settings.sightsPath) {
     settings.sightsPath = autoDetectUserSightsPath();
+  }
+  if (!settings.tempPath) {
+    settings.tempPath = path.join(__dirname, 'temp');
   }
   return settings;
 }
@@ -204,6 +206,8 @@ app.get('/api/settings', async (req, res) => {
     whitelistTags: settings.whitelistTags || '',
     limitPerDownload: settings.limitPerDownload || 0,
     limitGlobal: settings.limitGlobal || 0,
+    verifyIntegrity: settings.verifyIntegrity !== false,
+    tempPath: settings.tempPath || '',
     detectedWT: autoDetectWTPath(),
     detectedSights: autoDetectUserSightsPath(),
     isWTValid: settings.wtPath ? fs.existsSync(settings.wtPath) : false,
@@ -215,14 +219,16 @@ app.get('/api/settings', async (req, res) => {
 
 // API: Update settings
 app.post('/api/settings', (req, res) => {
-  const { wtPath, sightsPath, cookie, blacklistTags, whitelistTags, limitPerDownload, limitGlobal } = req.body;
+  const { wtPath, sightsPath, cookie, blacklistTags, whitelistTags, limitPerDownload, limitGlobal, verifyIntegrity, tempPath } = req.body;
   const cleanWT = wtPath ? wtPath.trim() : '';
   const cleanSights = sightsPath ? sightsPath.trim() : '';
   const cleanCookie = cookie ? cookie.trim() : '';
   const cleanBlacklist = blacklistTags ? blacklistTags.trim() : '';
   const cleanWhitelist = whitelistTags ? whitelistTags.trim() : '';
+  const cleanTemp = tempPath ? tempPath.trim() : '';
   const dlLimit = parseInt(limitPerDownload, 10) || 0;
   const gLimit = parseInt(limitGlobal, 10) || 0;
+  const valIntegrity = verifyIntegrity !== false;
 
   if (cleanWT && !fs.existsSync(cleanWT)) {
     return res.status(400).json({ error: 'War Thunder game folder path does not exist.' });
@@ -238,6 +244,16 @@ app.post('/api/settings', (req, res) => {
     }
   }
 
+  if (cleanTemp) {
+    try {
+      if (!fs.existsSync(cleanTemp)) {
+        fs.mkdirSync(cleanTemp, { recursive: true });
+      }
+    } catch (e) {
+      return res.status(400).json({ error: 'Failed to access or create the custom temp directory.' });
+    }
+  }
+
   const settings = { 
     wtPath: cleanWT, 
     sightsPath: cleanSights, 
@@ -245,7 +261,9 @@ app.post('/api/settings', (req, res) => {
     blacklistTags: cleanBlacklist,
     whitelistTags: cleanWhitelist,
     limitPerDownload: dlLimit,
-    limitGlobal: gLimit
+    limitGlobal: gLimit,
+    verifyIntegrity: valIntegrity,
+    tempPath: cleanTemp
   };
   saveSettings(settings);
   ensureSubdirsExist(cleanWT, cleanSights);
@@ -881,7 +899,7 @@ app.post('/api/download', async (req, res) => {
     return res.status(400).json({ error: 'Missing required parameters: url, type, name.' });
   }
 
-  const tempDir = path.join(__dirname, 'temp');
+  const tempDir = settings.tempPath || path.join(__dirname, 'temp');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
@@ -1177,7 +1195,8 @@ app.post('/api/queue/cancel', (req, res) => {
     downloadHistory.unshift(removed);
 
     // Clean up partial file in temp folder if any
-    const tempDir = path.join(__dirname, 'temp');
+    const settings = loadSettings();
+    const tempDir = settings.tempPath || path.join(__dirname, 'temp');
     const safeName = removed.name.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
     const tempZipPath = path.join(tempDir, safeName);
     if (fs.existsSync(tempZipPath)) {

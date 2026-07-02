@@ -209,6 +209,14 @@
           </div>
         </div>
 
+        <!-- Background Service Pill banner -->
+        <div style="background: rgba(124, 58, 237, 0.06); border: 1px solid rgba(124, 58, 237, 0.15); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px; animation: pulse 2s infinite; color: var(--accent-primary);">⚡</span>
+          <span style="font-size: 12px; font-weight: 500; color: var(--text-muted);">
+            <strong>Background Service Active:</strong> Downloads process entirely on the Node.js server. You can safely minimize or close this browser tab at any time without pausing your downloads.
+          </span>
+        </div>
+
         <!-- Filter Buttons row -->
         <div class="filter-panel" style="margin-bottom: 20px; padding: 12px 20px; display: flex; gap: 8px; justify-content: flex-start; align-items: center; border-radius: var(--radius-md);">
           <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-right: 8px; letter-spacing: 0.5px;">Filter Status:</span>
@@ -403,7 +411,7 @@
         
         <!-- Section: Game Paths -->
         <div class="settings-section">
-          <h3>📂 Game Directories</h3>
+          <h3>📂 Game Directories & Temp Storage</h3>
           <div class="settings-grid">
             <div class="settings-field-vertical">
               <label for="wt-path-input">Game Folder:</label>
@@ -417,6 +425,13 @@
               <div class="input-with-status">
                 <input type="text" id="sights-path-input" placeholder="e.g. C:\Users\...\Documents\My Games\WarThunder\Saves\...\UserSights">
                 <span class="path-status" id="sights-status-msg">Checking...</span>
+              </div>
+            </div>
+            <div class="settings-field-vertical" style="grid-column: span 2;">
+              <label for="temp-path-input">Temporary ZIP Storage Folder:</label>
+              <div class="input-with-status">
+                <input type="text" id="temp-path-input" placeholder="e.g. C:\TempWTDownloads (Leave empty for default app temp folder)">
+                <span class="path-status" id="temp-status-msg">Checking...</span>
               </div>
             </div>
           </div>

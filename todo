@@ -7,9 +7,10 @@
 - [x] Integration with War Thunder live update metadata
 - [x] Notification on completion or errors
 - Cleanup and separation of functions per individual files for better organization
-- [ ] Configurable download folder and temp storage
+- [x] Configurable download folder and temp storage
 - [x] Automatic cleanup of partial files on cancel
 - [x] Ability to import/export download lists
 - [x] Logging of download activity and errors
 - [x] Option to verify downloaded files against checksums
 - [x] UI for filtering and sorting downloads by status
+- [x] Support for background operation when app is minimized

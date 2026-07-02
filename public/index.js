@@ -25,6 +25,7 @@ const state = {
 const elements = {
   wtPathInput: document.getElementById('wt-path-input'),
   sightsPathInput: document.getElementById('sights-path-input'),
+  tempPathInput: document.getElementById('temp-path-input'),
   cookieInput: document.getElementById('cookie-input'),
   blacklistInput: document.getElementById('blacklist-input'),
   whitelistInput: document.getElementById('whitelist-input'),
@@ -33,6 +34,7 @@ const elements = {
   btnSaveSettings: document.getElementById('btn-save-settings'),
   pathStatusMsg: document.getElementById('path-status-msg'),
   sightsStatusMsg: document.getElementById('sights-status-msg'),
+  tempStatusMsg: document.getElementById('temp-status-msg'),
   cookieStatusMsg: document.getElementById('cookie-status-msg'),
   
   searchInput: document.getElementById('search-input'),
@@ -447,6 +449,13 @@ async function loadSettings() {
       updatePathStatus('sights', false, 'Set custom sights folder.');
     }
 
+    if (data.tempPath) {
+      elements.tempPathInput.value = data.tempPath;
+      updatePathStatus('temp', true, 'Temp folder verified.');
+    } else {
+      updatePathStatus('temp', false, 'Using default app temp folder.');
+    }
+
     if (data.cookie) {
       elements.cookieInput.value = data.cookie;
       if (data.cookieValid === true) {
@@ -507,6 +516,7 @@ async function loadSettings() {
 async function saveSettings() {
   const wtPath = elements.wtPathInput.value.trim();
   const sightsPath = elements.sightsPathInput.value.trim();
+  const tempPath = elements.tempPathInput ? elements.tempPathInput.value.trim() : '';
   const cookie = elements.cookieInput.value.trim();
   const blacklistTags = elements.blacklistInput.value.trim();
   const whitelistTags = elements.whitelistInput.value.trim();
@@ -518,7 +528,7 @@ async function saveSettings() {
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wtPath, sightsPath, cookie, blacklistTags, whitelistTags, limitPerDownload, limitGlobal, verifyIntegrity })
+      body: JSON.stringify({ wtPath, sightsPath, cookie, blacklistTags, whitelistTags, limitPerDownload, limitGlobal, verifyIntegrity, tempPath })
     });
     
     const data = await res.json();
@@ -533,6 +543,12 @@ async function saveSettings() {
         updatePathStatus('sights', true, 'Sights folder saved.');
       } else {
         updatePathStatus('sights', false, 'Set custom sights folder.');
+      }
+
+      if (data.settings.tempPath) {
+        updatePathStatus('temp', true, 'Temp folder saved.');
+      } else {
+        updatePathStatus('temp', false, 'Using default app temp folder.');
       }
 
       showToast('Settings saved successfully!', 'success');
@@ -557,6 +573,11 @@ function updatePathStatus(type, isValid, msg) {
     state.sightsPathValid = isValid;
     elements.sightsStatusMsg.innerText = msg;
     elements.sightsStatusMsg.className = 'path-status ' + (isValid ? 'valid' : 'invalid');
+  } else if (type === 'temp') {
+    if (elements.tempStatusMsg) {
+      elements.tempStatusMsg.innerText = msg;
+      elements.tempStatusMsg.className = 'path-status ' + (isValid ? 'valid' : 'info');
+    }
   }
 }
 
