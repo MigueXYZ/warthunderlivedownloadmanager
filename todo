@@ -6,7 +6,7 @@
 - [x] Make a settings modal
 - [x] Integration with War Thunder live update metadata
 - [x] Notification on completion or errors
-- Cleanup and separation of functions per individual files for better organization
+- [x] Cleanup and separation of functions per individual files for better organization
 - [x] Configurable download folder and temp storage
 - [x] Automatic cleanup of partial files on cancel
 - [x] Ability to import/export download lists
