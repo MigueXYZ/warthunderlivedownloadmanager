@@ -2255,5 +2255,124 @@ select:focus {
   word-break: break-all;
 }
 
+/* ==========================================
+   PREMIUM THEMES & NATIONS ACCENTS
+   ========================================== */
+
+/* Light Theme Variables Override */
+body.light-theme {
+  --bg-app: hsl(220, 30%, 96%);
+  --bg-sidebar: hsl(220, 25%, 90%);
+  --bg-card: hsla(220, 25%, 100%, 0.7);
+  --bg-card-hover: hsla(220, 25%, 100%, 0.9);
+  --bg-input: hsl(220, 20%, 98%);
+  --bg-input-focus: hsl(220, 20%, 94%);
+  
+  --border-color: hsla(220, 20%, 0%, 0.08);
+  --border-color-hover: hsla(220, 20%, 0%, 0.16);
+  
+  --text-main: hsl(220, 25%, 15%);
+  --text-muted: hsl(220, 15%, 45%);
+  --text-inverse: hsl(220, 30%, 98%);
+  
+  --shadow-main: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
+  --shadow-hover: 0 12px 40px 0 rgba(31, 38, 135, 0.12);
+}
+
+/* Light Theme Component Tweaks */
+body.light-theme .overlay-card,
+body.light-theme .settings-card,
+body.light-theme .storage-card,
+body.light-theme .logs-card,
+body.light-theme .details-card {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: var(--text-main) !important;
+}
+
+body.light-theme .overlay-card h2,
+body.light-theme .overlay-card h3,
+body.light-theme .overlay-card label,
+body.light-theme .settings-section h3,
+body.light-theme .settings-field-vertical label,
+body.light-theme .settings-modal-header h2,
+body.light-theme .storage-modal-header h2,
+body.light-theme .logs-modal-header h2 {
+  color: var(--text-main) !important;
+}
+
+body.light-theme input,
+body.light-theme select {
+  background: var(--bg-input) !important;
+  color: var(--text-main) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme input:focus,
+body.light-theme select:focus {
+  background: var(--bg-input-focus) !important;
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px hsla(200, 100%, 50%, 0.15);
+}
+
+body.light-theme .sidebar-nav button.active {
+  background: hsla(220, 25%, 0%, 0.05);
+}
+
+body.light-theme .logs-terminal {
+  background-color: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .logs-terminal pre {
+  color: #0f172a;
+}
+
+body.light-theme .banner-pill {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Nation Accent Customizations */
+body.theme-us {
+  --accent-primary: hsl(215, 90%, 52%);
+  --accent-primary-hover: hsl(215, 90%, 45%);
+  --accent-secondary: hsl(355, 85%, 55%);
+  --accent-secondary-hover: hsl(355, 85%, 48%);
+}
+
+body.theme-germany {
+  --accent-primary: hsl(120, 25%, 35%);
+  --accent-primary-hover: hsl(120, 25%, 28%);
+  --accent-secondary: hsl(45, 85%, 50%);
+  --accent-secondary-hover: hsl(45, 85%, 42%);
+}
+
+body.theme-ussr {
+  --accent-primary: hsl(0, 80%, 50%);
+  --accent-primary-hover: hsl(0, 80%, 42%);
+  --accent-secondary: hsl(45, 100%, 55%);
+  --accent-secondary-hover: hsl(45, 100%, 46%);
+}
+
+body.theme-uk {
+  --accent-primary: hsl(225, 75%, 35%);
+  --accent-primary-hover: hsl(225, 75%, 28%);
+  --accent-secondary: hsl(350, 80%, 50%);
+  --accent-secondary-hover: hsl(350, 80%, 42%);
+}
+
+body.theme-japan {
+  --accent-primary: hsl(355, 90%, 50%);
+  --accent-primary-hover: hsl(355, 90%, 42%);
+  --accent-secondary: hsl(195, 80%, 45%);
+  --accent-secondary-hover: hsl(195, 80%, 38%);
+}
+
 
 

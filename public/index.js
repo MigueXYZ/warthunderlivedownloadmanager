@@ -101,11 +101,14 @@ const elements = {
   logsConsole: document.getElementById('logs-console'),
   chkLibraryActiveVehicle: document.getElementById('chk-library-active-vehicle'),
   libraryActiveFilterContainer: document.getElementById('library-active-filter-container'),
-  libraryActiveVehicleLabel: document.getElementById('library-active-vehicle-label')
+  libraryActiveVehicleLabel: document.getElementById('library-active-vehicle-label'),
+  themeModeSelect: document.getElementById('theme-mode-select'),
+  themeNationSelect: document.getElementById('theme-nation-select')
 };
 
 // Initial Setup
 document.addEventListener('DOMContentLoaded', () => {
+  initThemes();
   loadSettings();
   loadLibrary();
   updateFilterVisibility();
@@ -510,6 +513,13 @@ async function loadSettings() {
     const integrityToggle = document.getElementById('verify-integrity-toggle');
     if (integrityToggle) {
       integrityToggle.checked = data.verifyIntegrity !== false;
+    }
+    
+    if (elements.themeModeSelect) {
+      elements.themeModeSelect.value = localStorage.getItem('theme-mode') || 'dark';
+    }
+    if (elements.themeNationSelect) {
+      elements.themeNationSelect.value = localStorage.getItem('theme-nation') || 'default';
     }
   } catch (e) {
     showToast('Failed to load settings from server', 'error');
@@ -2912,3 +2922,44 @@ window.openLogsModal = openLogsModal;
 window.closeLogsModal = closeLogsModal;
 window.refreshLogs = refreshLogs;
 window.clearLogs = clearLogs;
+
+// ==========================================
+/* PREMIUM THEMES & NATIONS ACCENTS */
+// ==========================================
+function initThemes() {
+  const savedMode = localStorage.getItem('theme-mode') || 'dark';
+  const savedNation = localStorage.getItem('theme-nation') || 'default';
+  
+  applyThemeMode(savedMode);
+  applyNationTheme(savedNation);
+
+  if (elements.themeModeSelect) elements.themeModeSelect.value = savedMode;
+  if (elements.themeNationSelect) elements.themeNationSelect.value = savedNation;
+}
+
+function applyThemeMode(mode) {
+  if (mode === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+}
+
+function applyNationTheme(nation) {
+  const nations = ['us', 'germany', 'ussr', 'uk', 'japan'];
+  nations.forEach(n => document.body.classList.remove(`theme-${n}`));
+  
+  if (nation !== 'default' && nations.includes(nation)) {
+    document.body.classList.add(`theme-${nation}`);
+  }
+}
+
+window.changeThemeMode = function(mode) {
+  localStorage.setItem('theme-mode', mode);
+  applyThemeMode(mode);
+};
+
+window.changeNationTheme = function(nation) {
+  localStorage.setItem('theme-nation', nation);
+  applyNationTheme(nation);
+};

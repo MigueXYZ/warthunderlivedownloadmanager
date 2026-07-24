@@ -487,6 +487,31 @@
           </div>
         </div>
 
+        <!-- Section: Theme Customization -->
+        <div class="settings-section">
+          <h3>🎨 Custom Themes & Aesthetics</h3>
+          <div class="settings-grid">
+            <div class="settings-field-vertical">
+              <label for="theme-mode-select">Theme Mode:</label>
+              <select id="theme-mode-select" onchange="changeThemeMode(this.value)">
+                <option value="dark">🌙 Dark Mode (Cyber Slate)</option>
+                <option value="light">☀️ Light Mode (Glassmorphism)</option>
+              </select>
+            </div>
+            <div class="settings-field-vertical">
+              <label for="theme-nation-select">Nation Accent Color:</label>
+              <select id="theme-nation-select" onchange="changeNationTheme(this.value)">
+                <option value="default">🔶 Default Amber (WT Live)</option>
+                <option value="us">🔵 US Star (Navy Blue & Red)</option>
+                <option value="germany">🟢 German Military (Olive Green & Gold)</option>
+                <option value="ussr">🔴 Soviet Union (Star Red & Gold)</option>
+                <option value="uk">🔵 UK Royal (Blue & Crimson)</option>
+                <option value="japan">🔴 Japan Sunrise (Sun Red & Ocean Blue)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <!-- Section: Notifications -->
         <div class="settings-section">
           <h3>🔔 System Notifications</h3>
