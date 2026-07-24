@@ -919,6 +919,130 @@ app.get('/api/telemetry', async (req, res) => {
   }
 });
 
+// API: Check updates for the software itself
+app.get('/api/software/check-update', async (req, res) => {
+  const forceMock = req.query.force === 'true';
+  const pkgPath = path.join(__dirname, 'package.json');
+  let currentVersion = '1.0.0';
+  
+  try {
+    if (fs.existsSync(pkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      currentVersion = pkg.version || '1.0.0';
+    }
+  } catch (err) {
+    logActivity('Error reading package.json version: ' + err.message, 'ERROR');
+  }
+
+  // Support for mock testing
+  if (forceMock) {
+    return res.json({
+      currentVersion,
+      latestVersion: '1.2.0',
+      updateAvailable: true,
+      releaseUrl: 'https://github.com/MigueXYZ/warthunderlivedownloadmanager/releases',
+      releaseName: 'v1.2.0: Drag & Drop Installer',
+      releaseNotes: '### Added\n- Drag & Drop ZIP local files installer\n- Advanced telemetry tracking improvements\n\n### Fixed\n- Minor layout anomalies'
+    });
+  }
+
+  try {
+    const response = await fetch('https://api.github.com/repos/MigueXYZ/warthunderlivedownloadmanager/releases/latest', {
+      headers: {
+        'User-Agent': 'warthunderlivedownloadmanager-updater'
+      }
+    });
+
+    if (response.status === 404) {
+      const tagsResponse = await fetch('https://api.github.com/repos/MigueXYZ/warthunderlivedownloadmanager/tags', {
+        headers: {
+          'User-Agent': 'warthunderlivedownloadmanager-updater'
+        }
+      });
+      if (tagsResponse.ok) {
+        const tags = await tagsResponse.json();
+        if (Array.isArray(tags) && tags.length > 0) {
+          const latestTag = tags[0].name.replace(/^v/, '');
+          const updateAvailable = isNewerVersion(currentVersion, latestTag);
+          return res.json({
+            currentVersion,
+            latestVersion: latestTag,
+            updateAvailable,
+            releaseUrl: `https://github.com/MigueXYZ/warthunderlivedownloadmanager/releases/tag/v${latestTag}`,
+            releaseName: `v${latestTag}`,
+            releaseNotes: 'New tag release available on GitHub.'
+          });
+        }
+      }
+      return res.json({
+        currentVersion,
+        latestVersion: currentVersion,
+        updateAvailable: false,
+        message: 'No releases or tags found on GitHub repository.'
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`GitHub API returned status ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.tag_name) {
+      throw new Error('Invalid release payload from GitHub');
+    }
+
+    const latestVersion = data.tag_name.replace(/^v/, '');
+    const updateAvailable = isNewerVersion(currentVersion, latestVersion);
+
+    res.json({
+      currentVersion,
+      latestVersion,
+      updateAvailable,
+      releaseUrl: data.html_url,
+      releaseName: data.name || data.tag_name,
+      releaseNotes: data.body || 'No release notes provided.'
+    });
+  } catch (err) {
+    logActivity('Error checking software update: ' + err.message, 'ERROR');
+    res.status(500).json({ error: 'Failed to check for updates: ' + err.message });
+  }
+});
+
+// API: Get recent activity logs
+app.get('/api/logs', (req, res) => {
+  if (!fs.existsSync(logFilePath)) {
+    return res.json({ logs: '[System] Log file does not exist yet. Perform some activity to generate logs.' });
+  }
+
+  try {
+    const data = fs.readFileSync(logFilePath, 'utf8');
+    const lines = data.split('\n');
+    const lastLines = lines.slice(-300).join('\n');
+    res.json({ logs: lastLines });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read logs: ' + err.message });
+  }
+});
+
+// API: Clear logs
+app.post('/api/logs/clear', (req, res) => {
+  try {
+    fs.writeFileSync(logFilePath, '', 'utf8');
+    logActivity('Logs cleared by user.', 'INFO');
+    res.json({ success: true, message: 'Log file cleared.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to clear logs: ' + err.message });
+  }
+});
+
+// API: Download log file
+app.get('/api/logs/download', (req, res) => {
+  if (!fs.existsSync(logFilePath)) {
+    return res.status(404).send('Log file does not exist.');
+  }
+  res.download(logFilePath, 'wt-live-manager.log');
+});
+
 // Start Server
 app.listen(PORT, () => {
   logActivity(`Server running at http://localhost:${PORT}`, 'INFO');
