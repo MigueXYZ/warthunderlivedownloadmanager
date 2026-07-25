@@ -488,6 +488,15 @@
                 <span class="path-status" id="sights-status-msg">Checking...</span>
               </div>
             </div>
+            <div class="settings-field-vertical" style="grid-column: span 2; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(38, 100, 235, 0.05); border: 1px solid rgba(38, 100, 235, 0.15); border-radius: var(--radius-md); padding: 12px 16px; width: 100%; gap: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">🔧 Fix Sights Folder Structure</span>
+                  <span style="font-size: 11px; color: var(--text-muted);">Moves sights installed directly inside UserSights into the required all_tanks folder so they work in-game.</span>
+                </div>
+                <button class="btn-primary" id="btn-fix-sights" onclick="fixSightsStructure(this)" style="padding: 8px 16px; font-size: 12px; white-space: nowrap;">🔧 Run Fix</button>
+              </div>
+            </div>
             <div class="settings-field-vertical" style="grid-column: span 2;">
               <label for="temp-path-input">Temporary ZIP Storage Folder:</label>
               <div class="input-with-status">

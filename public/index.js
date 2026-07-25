@@ -3106,3 +3106,28 @@ window.changeNationTheme = function(nation) {
   localStorage.setItem('theme-nation', nation);
   applyNationTheme(nation);
 };
+
+async function fixSightsStructure(btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const originalText = btn.innerText;
+  btn.innerText = '⏳ Fixing...';
+
+  try {
+    const res = await fetch('/api/library/fix-sights', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Successfully moved ${data.movedCount} sights to all_tanks folder!`, 'success');
+      loadLibrary(); // Reload installed list
+    } else {
+      showToast(data.error || 'Failed to fix sights folder structure.', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to connect to local server.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = originalText;
+  }
+}
+
+window.fixSightsStructure = fixSightsStructure;

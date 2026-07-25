@@ -1139,6 +1139,58 @@ app.post('/api/library/install-local', async (req, res) => {
   }
 });
 
+// API: Fix sights structure by moving loose sight folders under all_tanks
+app.post('/api/library/fix-sights', (req, res) => {
+  const settings = loadSettings();
+  if (!settings.sightsPath || !fs.existsSync(settings.sightsPath)) {
+    return res.status(400).json({ error: 'User Sights path is not set or invalid.' });
+  }
+
+  let movedCount = 0;
+
+  const fixDir = (baseDir) => {
+    if (!fs.existsSync(baseDir)) return;
+    const allTanksDir = path.join(baseDir, 'all_tanks');
+    if (!fs.existsSync(allTanksDir)) {
+      fs.mkdirSync(allTanksDir, { recursive: true });
+    }
+
+    try {
+      const files = fs.readdirSync(baseDir);
+      for (const file of files) {
+        const fullPath = path.join(baseDir, file);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          const lowerName = file.toLowerCase();
+          if (lowerName === 'all_tanks' || lowerName.endsWith('_disabled') || file.startsWith('.')) {
+            continue;
+          }
+
+          const destPath = path.join(allTanksDir, file);
+          if (!fs.existsSync(destPath)) {
+            fs.renameSync(fullPath, destPath);
+            movedCount++;
+          }
+        }
+      }
+    } catch (err) {
+      logActivity(`Error during fixDir for sights: ${err.message}`, 'ERROR');
+    }
+  };
+
+  // Fix active sights
+  fixDir(settings.sightsPath);
+  
+  // Fix disabled sights
+  const disabledDir = settings.sightsPath + '_disabled';
+  if (fs.existsSync(disabledDir)) {
+    fixDir(disabledDir);
+  }
+
+  logActivity(`Sights folder structure fixed. Moved ${movedCount} folders to all_tanks.`, 'INFO');
+  res.json({ success: true, movedCount });
+});
+
 // Start Server
 app.listen(PORT, () => {
   logActivity(`Server running at http://localhost:${PORT}`, 'INFO');
