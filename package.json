@@ -3,13 +3,26 @@
   "version": "1.3.0",
   "description": "Downloader and manager for War Thunder custom skins and sights.",
   "main": "server.js",
+  "bin": "server.js",
+  "pkg": {
+    "assets": [
+      "src/**/*.js",
+      "package.json"
+    ]
+  },
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build:backend": "npx pkg . --targets node18-win-x64 --output src-tauri/binaries/wt-live-manager-backend-x86_64-pc-windows-msvc.exe",
+    "tauri": "tauri"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "adm-zip": "^0.5.12",
     "cors": "^2.8.5",
-    "adm-zip": "^0.5.12"
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
+    "pkg": "^5.8.1"
   }
 }
