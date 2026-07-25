@@ -2374,5 +2374,22 @@ body.theme-japan {
   --accent-secondary-hover: hsl(195, 80%, 38%);
 }
 
+/* Drag and Drop Targets hover classes */
+.drop-target-box.hover {
+  transform: scale(1.03);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+#drop-target-skins.hover {
+  border-color: var(--accent-secondary) !important;
+  background: rgba(38, 100, 235, 0.12) !important;
+}
+#drop-target-sights.hover {
+  border-color: var(--accent-primary) !important;
+  background: rgba(245, 158, 11, 0.12) !important;
+}
+.drop-target-box.hover span {
+  transform: scale(1.2);
+}
+
 
 

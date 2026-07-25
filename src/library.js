@@ -182,10 +182,146 @@ function scanInstalledSights(sightsPath) {
   return installedSights;
 }
 
+const AdmZip = require('adm-zip');
+const { logActivity } = require('./logger');
+
+function installLocalZip(tempZipPath, type, settings) {
+  const targetBaseDir = type === 'sight' 
+    ? settings.sightsPath 
+    : path.join(settings.wtPath, 'UserSkins');
+    
+  if (!fs.existsSync(targetBaseDir)) {
+    fs.mkdirSync(targetBaseDir, { recursive: true });
+  }
+
+  const zip = new AdmZip(tempZipPath);
+  const entries = zip.getEntries();
+  
+  let hasRootFiles = false;
+  const rootFolders = new Set();
+  let zipHasWTFolderRoot = false;
+
+  for (const entry of entries) {
+    if (!entry.isDirectory) {
+      const parts = entry.entryName.split('/');
+      if (parts.length === 1) {
+        hasRootFiles = true;
+      } else {
+        rootFolders.add(parts[0]);
+      }
+    }
+  }
+
+  if (rootFolders.size === 1) {
+    const lowerRoot = Array.from(rootFolders)[0].toLowerCase();
+    if (lowerRoot === 'userskins' || lowerRoot === 'usersights' || lowerRoot === 'all_tanks') {
+      zipHasWTFolderRoot = true;
+    }
+  }
+
+  let extractionPath = targetBaseDir;
+  let createdFolder = '';
+
+  const safeName = path.basename(tempZipPath);
+
+  if (zipHasWTFolderRoot) {
+    const rootFolder = Array.from(rootFolders)[0];
+    const lowerRoot = rootFolder.toLowerCase();
+    
+    let prefix = rootFolder + '/';
+    if (lowerRoot === 'userskins') {
+      extractionPath = path.join(settings.wtPath, 'UserSkins');
+    } else if (lowerRoot === 'usersights') {
+      extractionPath = settings.sightsPath;
+    } else if (lowerRoot === 'all_tanks') {
+      extractionPath = path.join(settings.wtPath, 'UserSkins');
+    }
+
+    const subFolders = new Set();
+    for (const entry of entries) {
+      if (!entry.isDirectory && entry.entryName.startsWith(prefix)) {
+        const relativeName = entry.entryName.substring(prefix.length);
+        const parts = relativeName.split('/');
+        if (parts.length > 0) {
+          subFolders.add(parts[0]);
+        }
+      }
+    }
+
+    if (subFolders.size === 1) {
+      createdFolder = Array.from(subFolders)[0];
+    } else {
+      const folderName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
+      extractionPath = path.join(extractionPath, folderName);
+      createdFolder = folderName;
+      
+      if (!fs.existsSync(extractionPath)) {
+        fs.mkdirSync(extractionPath, { recursive: true });
+      }
+
+      for (const entry of entries) {
+        if (!entry.isDirectory && entry.entryName.startsWith(prefix)) {
+          const zipSub = new AdmZip(tempZipPath);
+          const relativeName = entry.entryName.substring(prefix.length);
+          const destFileDir = path.join(extractionPath, path.dirname(relativeName));
+          
+          if (!fs.existsSync(destFileDir)) {
+            fs.mkdirSync(destFileDir, { recursive: true });
+          }
+          zipSub.extractEntryTo(entry.entryName, destFileDir, false, true);
+        }
+      }
+      try { fs.unlinkSync(tempZipPath); } catch (_) {}
+    }
+
+    if (createdFolder && zipHasWTFolderRoot && subFolders.size === 1) {
+      zip.extractAllTo(extractionPath, true);
+      try { fs.unlinkSync(tempZipPath); } catch (_) {}
+    }
+
+  } else {
+    if (hasRootFiles || rootFolders.size > 1) {
+      const folderName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
+      extractionPath = path.join(targetBaseDir, folderName);
+      createdFolder = folderName;
+      if (!fs.existsSync(extractionPath)) {
+        fs.mkdirSync(extractionPath, { recursive: true });
+      }
+    } else if (rootFolders.size === 1) {
+      createdFolder = Array.from(rootFolders)[0];
+    }
+
+    zip.extractAllTo(extractionPath, true);
+    try { fs.unlinkSync(tempZipPath); } catch (_) {}
+  }
+
+  // Write local metadata
+  const metadataFolder = path.join(targetBaseDir, createdFolder);
+  if (fs.existsSync(metadataFolder)) {
+    const metaPath = path.join(metadataFolder, '.wtlive.json');
+    const metadata = {
+      postId: `local_${Date.now()}`,
+      name: safeName,
+      title: safeName.replace(/\.(zip)$/i, ''),
+      url: '',
+      type,
+      image: '',
+      author: { nickname: 'Local File', avatar: '' },
+      lang_group: 0,
+      downloadedAt: Date.now()
+    };
+    fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2), 'utf8');
+    logActivity(`Successfully installed local mod: ${createdFolder} (${type})`, 'INFO');
+  }
+  
+  return createdFolder;
+}
+
 module.exports = {
   isNewerVersion,
   getDirectoryStats,
   cleanDirectory,
   scanInstalledSkins,
-  scanInstalledSights
+  scanInstalledSights,
+  installLocalZip
 };

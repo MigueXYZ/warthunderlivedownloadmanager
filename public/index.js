@@ -103,7 +103,10 @@ const elements = {
   libraryActiveFilterContainer: document.getElementById('library-active-filter-container'),
   libraryActiveVehicleLabel: document.getElementById('library-active-vehicle-label'),
   themeModeSelect: document.getElementById('theme-mode-select'),
-  themeNationSelect: document.getElementById('theme-nation-select')
+  themeNationSelect: document.getElementById('theme-nation-select'),
+  dropZoneOverlay: document.getElementById('drop-zone-overlay'),
+  dropTargetSkins: document.getElementById('drop-target-skins'),
+  dropTargetSights: document.getElementById('drop-target-sights')
 };
 
 // Initial Setup
@@ -319,6 +322,123 @@ function setupEventListeners() {
       showToast(forceMock ? 'Checking for software updates (Debug)...' : 'Checking for software updates...', 'info');
       checkSoftwareUpdate(forceMock, true);
     });
+  }
+
+  // Drag & Drop local ZIP files installer
+  let dragCounter = 0;
+  window.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    if (!elements.dropZoneOverlay) return;
+    
+    const hasFiles = e.dataTransfer.types.includes('Files');
+    if (!hasFiles) return;
+
+    dragCounter++;
+    if (dragCounter === 1) {
+      elements.dropZoneOverlay.classList.remove('hidden');
+    }
+  });
+
+  window.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    if (!elements.dropZoneOverlay) return;
+    
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      elements.dropZoneOverlay.classList.add('hidden');
+    }
+  });
+
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    if (elements.dropZoneOverlay) {
+      elements.dropZoneOverlay.classList.add('hidden');
+    }
+  });
+
+  if (elements.dropTargetSkins) {
+    elements.dropTargetSkins.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      elements.dropTargetSkins.classList.add('hover');
+    });
+    elements.dropTargetSkins.addEventListener('dragleave', () => {
+      elements.dropTargetSkins.classList.remove('hover');
+    });
+    elements.dropTargetSkins.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      elements.dropTargetSkins.classList.remove('hover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        await handleLocalInstall(files[0], 'camouflage');
+      }
+    });
+  }
+
+  if (elements.dropTargetSights) {
+    elements.dropTargetSights.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      elements.dropTargetSights.classList.add('hover');
+    });
+    elements.dropTargetSights.addEventListener('dragleave', () => {
+      elements.dropTargetSights.classList.remove('hover');
+    });
+    elements.dropTargetSights.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      elements.dropTargetSights.classList.remove('hover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        await handleLocalInstall(files[0], 'sight');
+      }
+    });
+  }
+}
+
+// Install a locally uploaded ZIP modification
+async function handleLocalInstall(file, type) {
+  if (!file.name.toLowerCase().endsWith('.zip')) {
+    showToast('Only ZIP archive files are supported for local installations.', 'error');
+    return;
+  }
+
+  showToast(`Installing local ${type}...`, 'info');
+  
+  if (elements.installOverlay) {
+    elements.overlayTitle.innerText = 'Installing Local Mod...';
+    const descEl = document.getElementById('overlay-desc');
+    if (descEl) descEl.innerText = `Extracting ${file.name} to game folders.`;
+    elements.installOverlay.classList.remove('hidden');
+  }
+
+  try {
+    const res = await fetch('/api/library/install-local', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-File-Name': encodeURIComponent(file.name),
+        'X-Mod-Type': type
+      },
+      body: file
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Successfully installed: ${file.name}`, 'success');
+      loadLibrary(); // Reload installed list
+    } else {
+      showToast(data.error || 'Failed to install local mod.', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to connect to local server for installation.', 'error');
+  } finally {
+    if (elements.installOverlay) {
+      elements.installOverlay.classList.add('hidden');
+    }
   }
 }
 

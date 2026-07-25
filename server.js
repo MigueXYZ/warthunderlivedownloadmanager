@@ -6,7 +6,7 @@ const path = require('path');
 const { logActivity, logFilePath } = require('./src/logger');
 const { loadSettings, saveSettings, ensureSubdirsExist } = require('./src/settings');
 const { fetchPostMetadata } = require('./src/feed');
-const { isNewerVersion, getDirectoryStats, cleanDirectory, scanInstalledSkins, scanInstalledSights } = require('./src/library');
+const { isNewerVersion, getDirectoryStats, cleanDirectory, scanInstalledSkins, scanInstalledSights, installLocalZip } = require('./src/library');
 const { queueState, processQueue } = require('./src/queue');
 
 const app = express();
@@ -938,11 +938,11 @@ app.get('/api/software/check-update', async (req, res) => {
   if (forceMock) {
     return res.json({
       currentVersion,
-      latestVersion: '1.2.0',
+      latestVersion: '1.3.0',
       updateAvailable: true,
       releaseUrl: 'https://github.com/MigueXYZ/warthunderlivedownloadmanager/releases',
-      releaseName: 'v1.2.0: Drag & Drop Installer',
-      releaseNotes: '### Added\n- Drag & Drop ZIP local files installer\n- Advanced telemetry tracking improvements\n\n### Fixed\n- Minor layout anomalies'
+      releaseName: 'v1.3.0: Storage Dashboard & Disk Usage Charts',
+      releaseNotes: '### Added\n- Beautiful visual charts detailing storage distributions\n- Storage clean history logging\n\n### Fixed\n- Minor layout anomalies'
     });
   }
 
@@ -1041,6 +1041,62 @@ app.get('/api/logs/download', (req, res) => {
     return res.status(404).send('Log file does not exist.');
   }
   res.download(logFilePath, 'wt-live-manager.log');
+});
+
+// API: Install a locally uploaded ZIP file
+app.post('/api/library/install-local', async (req, res) => {
+  const encodedFilename = req.headers['x-file-name'];
+  const type = req.headers['x-mod-type'];
+
+  if (!encodedFilename || !type) {
+    return res.status(400).json({ error: 'Missing headers: X-File-Name or X-Mod-Type' });
+  }
+
+  const filename = decodeURIComponent(encodedFilename);
+  const settings = loadSettings();
+
+  if (type === 'camouflage' && (!settings.wtPath || !fs.existsSync(settings.wtPath))) {
+    return res.status(400).json({ error: 'War Thunder game path is not set or invalid.' });
+  }
+  if (type === 'sight' && (!settings.sightsPath || !fs.existsSync(settings.sightsPath))) {
+    return res.status(400).json({ error: 'User Sights path is not set or invalid.' });
+  }
+
+  const tempDir = settings.tempPath || path.join(__dirname, 'temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  const safeName = filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+  const tempZipPath = path.join(tempDir, `local_${Date.now()}_${safeName}`);
+
+  const fileStream = fs.createWriteStream(tempZipPath);
+
+  try {
+    await new Promise((resolve, reject) => {
+      req.pipe(fileStream);
+      req.on('end', resolve);
+      req.on('error', reject);
+      fileStream.on('error', reject);
+    });
+
+    logActivity(`Uploaded local ZIP file saved to ${tempZipPath}. Installing...`, 'INFO');
+    
+    // Extract and install ZIP
+    const installedFolder = installLocalZip(tempZipPath, type, settings);
+    
+    res.json({
+      success: true,
+      message: `Successfully installed local modification.`,
+      folder: installedFolder
+    });
+  } catch (err) {
+    logActivity(`Failed to install local mod ZIP: ${err.message}`, 'ERROR');
+    if (fs.existsSync(tempZipPath)) {
+      try { fs.unlinkSync(tempZipPath); } catch (_) {}
+    }
+    res.status(500).json({ error: `Installation failed: ${err.message}` });
+  }
 });
 
 // Start Server
