@@ -357,6 +357,32 @@
           </div>
         </div>
 
+        <!-- Segmented Storage Bar Chart -->
+        <div class="storage-chart-container" style="margin-bottom: 24px; background: var(--border-color); border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--border-color);">
+          <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">📊 Storage Distribution</span>
+          <!-- The visual bar -->
+          <div class="storage-visual-bar" style="display: flex; height: 24px; border-radius: 12px; overflow: hidden; background: hsla(220, 20%, 100%, 0.05); width: 100%;">
+            <div id="bar-game-files" style="background: var(--color-success); width: 0%; height: 100%; transition: width 0.5s ease-out; position: relative;" title="Active Game Files"></div>
+            <div id="bar-source-files" style="background: var(--color-warning); width: 0%; height: 100%; transition: width 0.5s ease-out; position: relative;" title="Source Projects"></div>
+            <div id="bar-archive-files" style="background: hsl(0, 85%, 60%); width: 0%; height: 100%; transition: width 0.5s ease-out; position: relative;" title="Archive Backups"></div>
+          </div>
+          <!-- Legends -->
+          <div class="storage-chart-legends" style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 11px; color: var(--text-muted);">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 10px; height: 10px; background: var(--color-success); border-radius: 50%;"></span>
+              <span>Active Game Files: <strong id="lbl-game-pct" style="color: var(--text-main);">0%</strong></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 10px; height: 10px; background: var(--color-warning); border-radius: 50%;"></span>
+              <span>Source Projects (.psd, .xcf): <strong id="lbl-source-pct" style="color: var(--text-main);">0%</strong></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 10px; height: 10px; background: hsl(0, 85%, 60%); border-radius: 50%;"></span>
+              <span>Archive Backups (.zip, .rar): <strong id="lbl-archive-pct" style="color: var(--text-main);">0%</strong></span>
+            </div>
+          </div>
+        </div>
+
         <!-- Info alert box -->
         <div class="storage-alert">
           💡 <strong>Pro-Tip:</strong> Custom skin creators often leave Photoshop files (.psd) or backup archives (.zip) inside their directories. These files are <strong>ignored by the game</strong> but consume gigabytes of disk space. Cleaning them is 100% safe!

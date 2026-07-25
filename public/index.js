@@ -2567,10 +2567,33 @@ async function openStorageModal() {
     // Fill stat boxes
     const toMB = (bytes) => (bytes / 1024 / 1024).toFixed(1) + ' MB';
     
-    document.getElementById('storage-val-total').innerText = toMB(data.totals.totalSize);
+    const totalSize = data.totals.totalSize || 0;
+    document.getElementById('storage-val-total').innerText = toMB(totalSize);
     document.getElementById('storage-val-source').innerText = toMB(data.totals.sourceSize);
     document.getElementById('storage-val-archive').innerText = toMB(data.totals.archiveSize);
     document.getElementById('storage-val-game').innerText = toMB(data.totals.gameSize);
+
+    if (totalSize > 0) {
+      const gamePct = ((data.totals.gameSize / totalSize) * 100).toFixed(1);
+      const sourcePct = ((data.totals.sourceSize / totalSize) * 100).toFixed(1);
+      const archivePct = ((data.totals.archiveSize / totalSize) * 100).toFixed(1);
+
+      document.getElementById('bar-game-files').style.width = `${(data.totals.gameSize / totalSize) * 100}%`;
+      document.getElementById('bar-source-files').style.width = `${(data.totals.sourceSize / totalSize) * 100}%`;
+      document.getElementById('bar-archive-files').style.width = `${(data.totals.archiveSize / totalSize) * 100}%`;
+
+      document.getElementById('lbl-game-pct').innerText = `${gamePct}%`;
+      document.getElementById('lbl-source-pct').innerText = `${sourcePct}%`;
+      document.getElementById('lbl-archive-pct').innerText = `${archivePct}%`;
+    } else {
+      document.getElementById('bar-game-files').style.width = '0%';
+      document.getElementById('bar-source-files').style.width = '0%';
+      document.getElementById('bar-archive-files').style.width = '0%';
+
+      document.getElementById('lbl-game-pct').innerText = '0%';
+      document.getElementById('lbl-source-pct').innerText = '0%';
+      document.getElementById('lbl-archive-pct').innerText = '0%';
+    }
     
     // Fill list of mods
     if (data.mods && data.mods.length > 0) {

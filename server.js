@@ -938,11 +938,11 @@ app.get('/api/software/check-update', async (req, res) => {
   if (forceMock) {
     return res.json({
       currentVersion,
-      latestVersion: '1.3.0',
+      latestVersion: '1.4.0',
       updateAvailable: true,
       releaseUrl: 'https://github.com/MigueXYZ/warthunderlivedownloadmanager/releases',
-      releaseName: 'v1.3.0: Storage Dashboard & Disk Usage Charts',
-      releaseNotes: '### Added\n- Beautiful visual charts detailing storage distributions\n- Storage clean history logging\n\n### Fixed\n- Minor layout anomalies'
+      releaseName: 'v1.4.0: Custom Collections & Favorites',
+      releaseNotes: '### Added\n- Group installed mods into playlists and folders\n- Mark modifications as favorites for fast tracking\n\n### Fixed\n- Telemetry filter quirks'
     });
   }
 
