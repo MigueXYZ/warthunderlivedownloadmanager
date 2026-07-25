@@ -247,7 +247,7 @@ async function processQueue() {
 
       // Extract ZIP
       const targetBaseDir = item.type === 'sight' 
-        ? settings.sightsPath 
+        ? path.join(settings.sightsPath, 'all_tanks') 
         : path.join(settings.wtPath, 'UserSkins');
 
       const zip = new AdmZip(tempZipPath);
@@ -288,7 +288,7 @@ async function processQueue() {
         } else if (lowerRoot === 'usersights') {
           extractionPath = settings.sightsPath;
         } else if (lowerRoot === 'all_tanks') {
-          extractionPath = path.join(settings.wtPath, 'UserSkins');
+          extractionPath = settings.sightsPath;
         }
 
         const subFolders = new Set();

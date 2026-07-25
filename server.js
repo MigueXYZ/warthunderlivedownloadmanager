@@ -630,7 +630,19 @@ app.post('/api/storage/clean', (req, res) => {
   } else if (type === 'sight') {
     if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
     folderPath = path.join(settings.sightsPath, name);
+    if (!fs.existsSync(folderPath)) {
+      const allTanksPath = path.join(settings.sightsPath, 'all_tanks', name);
+      if (fs.existsSync(allTanksPath)) {
+        folderPath = allTanksPath;
+      }
+    }
     disabledFolderPath = path.join(settings.sightsPath + '_disabled', name);
+    if (!fs.existsSync(disabledFolderPath)) {
+      const allTanksDisabledPath = path.join(settings.sightsPath + '_disabled', 'all_tanks', name);
+      if (fs.existsSync(allTanksDisabledPath)) {
+        disabledFolderPath = allTanksDisabledPath;
+      }
+    }
   } else {
     return res.status(400).json({ error: 'Invalid type' });
   }
@@ -689,8 +701,24 @@ app.post('/api/installed/toggle', (req, res) => {
     return res.status(400).json({ error: 'Invalid type' });
   }
 
-  const activePath = path.join(activeBaseDir, name);
-  const disabledPath = path.join(disabledBaseDir, name);
+  let activePath = path.join(activeBaseDir, name);
+  let disabledPath = path.join(disabledBaseDir, name);
+
+  if (type === 'sight') {
+    const allTanksActive = path.join(activeBaseDir, 'all_tanks', name);
+    const allTanksDisabled = path.join(disabledBaseDir, 'all_tanks', name);
+    if (fs.existsSync(allTanksActive) || fs.existsSync(allTanksDisabled)) {
+      activePath = allTanksActive;
+      disabledPath = allTanksDisabled;
+      // Make sure the target all_tanks folder exists under disabledBaseDir/activeBaseDir
+      if (!fs.existsSync(path.dirname(activePath))) {
+        fs.mkdirSync(path.dirname(activePath), { recursive: true });
+      }
+      if (!fs.existsSync(path.dirname(disabledPath))) {
+        fs.mkdirSync(path.dirname(disabledPath), { recursive: true });
+      }
+    }
+  }
 
   const activeExists = fs.existsSync(activePath);
   const disabledExists = fs.existsSync(disabledPath);
@@ -737,7 +765,19 @@ app.delete('/api/installed', (req, res) => {
   } else if (type === 'sight') {
     if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
     folderPath = path.join(settings.sightsPath, name);
+    if (!fs.existsSync(folderPath)) {
+      const allTanksPath = path.join(settings.sightsPath, 'all_tanks', name);
+      if (fs.existsSync(allTanksPath)) {
+        folderPath = allTanksPath;
+      }
+    }
     disabledFolderPath = path.join(settings.sightsPath + '_disabled', name);
+    if (!fs.existsSync(disabledFolderPath)) {
+      const allTanksDisabledPath = path.join(settings.sightsPath + '_disabled', 'all_tanks', name);
+      if (fs.existsSync(allTanksDisabledPath)) {
+        disabledFolderPath = allTanksDisabledPath;
+      }
+    }
   } else {
     return res.status(400).json({ error: 'Invalid type' });
   }

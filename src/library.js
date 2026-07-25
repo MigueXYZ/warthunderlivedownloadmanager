@@ -149,6 +149,10 @@ function scanInstalledSights(sightsPath) {
         const fullPath = path.join(dir, file);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
+          if (file.toLowerCase() === 'all_tanks') {
+            scan(fullPath, isDisabled);
+            continue;
+          }
           let metadata = null;
           const metaPath = path.join(fullPath, '.wtlive.json');
           if (fs.existsSync(metaPath)) {
@@ -187,7 +191,7 @@ const { logActivity } = require('./logger');
 
 function installLocalZip(tempZipPath, type, settings) {
   const targetBaseDir = type === 'sight' 
-    ? settings.sightsPath 
+    ? path.join(settings.sightsPath, 'all_tanks') 
     : path.join(settings.wtPath, 'UserSkins');
     
   if (!fs.existsSync(targetBaseDir)) {
@@ -234,7 +238,7 @@ function installLocalZip(tempZipPath, type, settings) {
     } else if (lowerRoot === 'usersights') {
       extractionPath = settings.sightsPath;
     } else if (lowerRoot === 'all_tanks') {
-      extractionPath = path.join(settings.wtPath, 'UserSkins');
+      extractionPath = settings.sightsPath;
     }
 
     const subFolders = new Set();
