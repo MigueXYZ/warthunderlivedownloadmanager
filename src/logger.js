@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const logFilePath = path.join(__dirname, '..', 'app.log');
+const isPkg = typeof process.pkg !== 'undefined';
+const baseDir = isPkg ? path.dirname(process.execPath) : path.join(__dirname, '..');
+const logFilePath = path.join(baseDir, 'app.log');
 
 function logActivity(message, level = 'INFO') {
   const timestamp = new Date().toLocaleString();

@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const { logActivity } = require('./logger');
 
-const SETTINGS_FILE = path.join(__dirname, '..', 'settings.json');
+const isPkg = typeof process.pkg !== 'undefined';
+const baseDir = isPkg ? path.dirname(process.execPath) : path.join(__dirname, '..');
+const SETTINGS_FILE = path.join(baseDir, 'settings.json');
 
 // Helper to load settings
 function loadSettings() {
@@ -23,7 +25,7 @@ function loadSettings() {
     settings.sightsPath = autoDetectUserSightsPath();
   }
   if (!settings.tempPath) {
-    settings.tempPath = path.join(__dirname, '..', 'temp');
+    settings.tempPath = path.join(baseDir, 'temp');
   }
   return settings;
 }

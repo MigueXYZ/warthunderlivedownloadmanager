@@ -3,6 +3,9 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 
+const isPkg = typeof process.pkg !== 'undefined';
+const baseDir = isPkg ? path.dirname(process.execPath) : __dirname;
+
 const { logActivity, logFilePath } = require('./src/logger');
 const { loadSettings, saveSettings, ensureSubdirsExist } = require('./src/settings');
 const { fetchPostMetadata } = require('./src/feed');
@@ -375,7 +378,7 @@ app.post('/api/queue/cancel', (req, res) => {
 
     // Clean up partial file in temp folder if any
     const settings = loadSettings();
-    const tempDir = settings.tempPath || path.join(__dirname, 'temp');
+    const tempDir = settings.tempPath || path.join(baseDir, 'temp');
     const safeName = removed.name.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
     const tempZipPath = path.join(tempDir, safeName);
     if (fs.existsSync(tempZipPath)) {
@@ -1102,7 +1105,7 @@ app.post('/api/library/install-local', async (req, res) => {
     return res.status(400).json({ error: 'User Sights path is not set or invalid.' });
   }
 
-  const tempDir = settings.tempPath || path.join(__dirname, 'temp');
+  const tempDir = settings.tempPath || path.join(baseDir, 'temp');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
