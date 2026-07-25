@@ -1,3 +1,17 @@
+// Global fetch interceptor for Tauri production builds
+(function() {
+  const isTauri = window.location.origin.includes('tauri') || window.location.origin.startsWith('file://');
+  if (isTauri) {
+    const originalFetch = window.fetch;
+    window.fetch = function(input, init) {
+      if (typeof input === 'string' && input.startsWith('/')) {
+        input = 'http://localhost:3000' + input;
+      }
+      return originalFetch(input, init);
+    };
+  }
+})();
+
 // App State
 const state = {
   activeTab: 'browse',
