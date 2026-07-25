@@ -236,7 +236,11 @@ function installLocalZip(tempZipPath, type, settings) {
     if (lowerRoot === 'userskins') {
       extractionPath = path.join(settings.wtPath, 'UserSkins');
     } else if (lowerRoot === 'usersights') {
-      extractionPath = settings.sightsPath;
+      extractionPath = path.dirname(settings.sightsPath);
+      const hasAllTanks = entries.some(e => e.entryName.toLowerCase().startsWith('usersights/all_tanks/'));
+      if (hasAllTanks) {
+        prefix = rootFolder + '/all_tanks/';
+      }
     } else if (lowerRoot === 'all_tanks') {
       extractionPath = settings.sightsPath;
     }
