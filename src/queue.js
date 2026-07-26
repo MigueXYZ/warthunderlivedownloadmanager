@@ -250,141 +250,130 @@ async function processQueue() {
         ? path.join(settings.sightsPath, 'all_tanks') 
         : path.join(settings.wtPath, 'UserSkins');
 
-      const zip = new AdmZip(tempZipPath);
-      const entries = zip.getEntries();
-      
-      let hasRootFiles = false;
-      const rootFolders = new Set();
-      let zipHasWTFolderRoot = false;
+      if (item.type === 'sight') {
+        const zip = new AdmZip(tempZipPath);
+        const entries = zip.getEntries();
+        let blkFilesExtracted = [];
 
-      for (const entry of entries) {
-        if (!entry.isDirectory) {
-          const parts = entry.entryName.split('/');
-          if (parts.length === 1) {
-            hasRootFiles = true;
-          } else {
-            rootFolders.add(parts[0]);
-          }
-        }
-      }
-
-      if (rootFolders.size === 1) {
-        const lowerRoot = Array.from(rootFolders)[0].toLowerCase();
-        if (lowerRoot === 'userskins' || lowerRoot === 'usersights' || lowerRoot === 'all_tanks') {
-          zipHasWTFolderRoot = true;
-        }
-      }
-
-      let extractionPath = targetBaseDir;
-      let createdFolder = '';
-
-      if (zipHasWTFolderRoot) {
-        const rootFolder = Array.from(rootFolders)[0];
-        const lowerRoot = rootFolder.toLowerCase();
-        
-        let prefix = rootFolder + '/';
-        if (lowerRoot === 'userskins') {
-          extractionPath = path.join(settings.wtPath, 'UserSkins');
-        } else if (lowerRoot === 'usersights') {
-          extractionPath = path.dirname(settings.sightsPath);
-          const hasAllTanks = entries.some(e => e.entryName.toLowerCase().startsWith('usersights/all_tanks/'));
-          if (hasAllTanks) {
-            prefix = rootFolder + '/all_tanks/';
-          }
-        } else if (lowerRoot === 'all_tanks') {
-          extractionPath = settings.sightsPath;
+        if (!fs.existsSync(targetBaseDir)) {
+          fs.mkdirSync(targetBaseDir, { recursive: true });
         }
 
-        const subFolders = new Set();
         for (const entry of entries) {
-          if (!entry.isDirectory && entry.entryName.startsWith(prefix)) {
-            const relativeName = entry.entryName.substring(prefix.length);
-            const parts = relativeName.split('/');
-            if (parts.length > 0) {
-              subFolders.add(parts[0]);
+          if (!entry.isDirectory && entry.entryName.toLowerCase().endsWith('.blk')) {
+            const blkFilename = path.basename(entry.entryName);
+            const destPath = path.join(targetBaseDir, blkFilename);
+            fs.writeFileSync(destPath, entry.getData());
+            blkFilesExtracted.push(blkFilename);
+
+            // Write metadata for this blk file next to it
+            const metaPath = destPath.replace(/\.blk$/i, '.wtlive.json');
+            await writeQueueMetadata(metaPath, item);
+          }
+        }
+
+        try { fs.unlinkSync(tempZipPath); } catch (_) {}
+
+        item.status = 'completed';
+        item.progress = 100;
+        item.completedAt = Date.now();        
+        logActivity(`[Queue] Completed sights installation for: ${item.title}`, 'INFO');
+      } else {
+        const zip = new AdmZip(tempZipPath);
+        const entries = zip.getEntries();
+        
+        let hasRootFiles = false;
+        const rootFolders = new Set();
+        let zipHasWTFolderRoot = false;
+
+        for (const entry of entries) {
+          if (!entry.isDirectory) {
+            const parts = entry.entryName.split('/');
+            if (parts.length === 1) {
+              hasRootFiles = true;
+            } else {
+              rootFolders.add(parts[0]);
             }
           }
         }
 
-        if (subFolders.size === 1) {
-          createdFolder = Array.from(subFolders)[0];
-        } else {
-          const folderName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
-          extractionPath = path.join(extractionPath, folderName);
-          createdFolder = folderName;
+        let extractionPath = targetBaseDir;
+        let createdFolder = '';
+
+        if (rootFolders.size === 1) {
+          const rootFolderName = Array.from(rootFolders)[0];
+          const lowerRoot = rootFolderName.toLowerCase();
+          if (lowerRoot === 'userskins' || lowerRoot === 'usersights' || lowerRoot === 'all_tanks') {
+            zipHasWTFolderRoot = true;
+          }
+        }
+
+        if (zipHasWTFolderRoot) {
+          const rootFolder = Array.from(rootFolders)[0];
+          const lowerRoot = rootFolder.toLowerCase();
           
-          if (!fs.existsSync(extractionPath)) {
-            fs.mkdirSync(extractionPath, { recursive: true });
+          let prefix = rootFolder + '/';
+          if (lowerRoot === 'userskins') {
+            extractionPath = path.join(settings.wtPath, 'UserSkins');
+          } else if (lowerRoot === 'usersights') {
+            extractionPath = path.dirname(settings.sightsPath);
+            const hasAllTanks = entries.some(e => e.entryName.toLowerCase().startsWith('usersights/all_tanks/'));
+            if (hasAllTanks) {
+              prefix = rootFolder + '/all_tanks/';
+            }
+          } else if (lowerRoot === 'all_tanks') {
+            extractionPath = settings.sightsPath;
           }
 
+          const subFolders = new Set();
           for (const entry of entries) {
             if (!entry.isDirectory && entry.entryName.startsWith(prefix)) {
-              const zipSub = new AdmZip(tempZipPath);
               const relativeName = entry.entryName.substring(prefix.length);
-              const destFileDir = path.join(extractionPath, path.dirname(relativeName));
-              
-              if (!fs.existsSync(destFileDir)) {
-                fs.mkdirSync(destFileDir, { recursive: true });
+              const parts = relativeName.split('/');
+              if (parts.length > 0) {
+                subFolders.add(parts[0]);
               }
-              zipSub.extractEntryTo(entry.entryName, destFileDir, false, true);
             }
           }
-          fs.unlinkSync(tempZipPath);
-        }
 
-        if (createdFolder && zipHasWTFolderRoot && subFolders.size === 1) {
+          if (subFolders.size === 1) {
+            createdFolder = Array.from(subFolders)[0];
+          } else {
+            createdFolder = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
+          }
+
+          if (createdFolder && zipHasWTFolderRoot && subFolders.size === 1) {
+            zip.extractAllTo(extractionPath, true);
+            fs.unlinkSync(tempZipPath);
+          }
+
+        } else {
+          if (hasRootFiles || rootFolders.size > 1) {
+            const folderName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
+            extractionPath = path.join(targetBaseDir, folderName);
+            createdFolder = folderName;
+            if (!fs.existsSync(extractionPath)) {
+              fs.mkdirSync(extractionPath, { recursive: true });
+            }
+          } else if (rootFolders.size === 1) {
+            createdFolder = Array.from(rootFolders)[0];
+          }
+
           zip.extractAllTo(extractionPath, true);
           fs.unlinkSync(tempZipPath);
         }
 
-      } else {
-        if (hasRootFiles || rootFolders.size > 1) {
-          const folderName = safeName.replace(/\.(zip|rar|tar|gz)$/i, '');
-          extractionPath = path.join(targetBaseDir, folderName);
-          createdFolder = folderName;
-          if (!fs.existsSync(extractionPath)) {
-            fs.mkdirSync(extractionPath, { recursive: true });
-          }
-        } else if (rootFolders.size === 1) {
-          createdFolder = Array.from(rootFolders)[0];
+        const metadataFolder = path.join(targetBaseDir, createdFolder);
+        createdExtractionFolder = metadataFolder;
+        if (fs.existsSync(metadataFolder)) {
+          await writeQueueMetadata(metadataFolder, item);
         }
 
-        zip.extractAllTo(extractionPath, true);
-        fs.unlinkSync(tempZipPath);
+        item.status = 'completed';
+        item.progress = 100;
+        item.completedAt = Date.now();        
+        logActivity(`[Queue] Completed skins installation for: ${item.title}`, 'INFO');
       }
-
-      const metadataFolder = path.join(targetBaseDir, createdFolder);
-
-      // Clean up double-nested all_tanks subfolder if it exists
-      if (item.type === 'sight' && fs.existsSync(metadataFolder) && fs.statSync(metadataFolder).isDirectory()) {
-        const nestedAllTanks = path.join(metadataFolder, 'all_tanks');
-        if (fs.existsSync(nestedAllTanks) && fs.statSync(nestedAllTanks).isDirectory()) {
-          try {
-            const files = fs.readdirSync(nestedAllTanks);
-            for (const file of files) {
-              const src = path.join(nestedAllTanks, file);
-              const dest = path.join(metadataFolder, file);
-              if (!fs.existsSync(dest)) {
-                fs.renameSync(src, dest);
-              }
-            }
-            fs.rmdirSync(nestedAllTanks);
-            logActivity(`Automatically flattened nested all_tanks folder structure in ${createdFolder}`, 'INFO');
-          } catch (e) {
-            logActivity(`Failed to flatten nested all_tanks folder: ${e.message}`, 'ERROR');
-          }
-        }
-      }
-
-      createdExtractionFolder = metadataFolder;
-      if (fs.existsSync(metadataFolder)) {
-        await writeQueueMetadata(metadataFolder, item);
-      }
-
-      item.status = 'completed';
-      item.progress = 100;
-      item.completedAt = Date.now();        
-      logActivity(`[Queue] Completed installation for: ${item.title}`, 'INFO');
 
     } catch (err) {
       const isRetryable = item.status !== 'cancelled' && item.status !== 'paused';
@@ -449,8 +438,13 @@ async function processQueue() {
 }
 
 // Write .wtlive.json metadata file inside custom folders
-async function writeQueueMetadata(folder, item) {
-  const metaPath = path.join(folder, '.wtlive.json');
+async function writeQueueMetadata(targetPath, item) {
+  let metaPath = '';
+  if (targetPath.endsWith('.wtlive.json')) {
+    metaPath = targetPath;
+  } else {
+    metaPath = path.join(targetPath, '.wtlive.json');
+  }
   const metadata = {
     postId: item.postId,
     name: item.name,

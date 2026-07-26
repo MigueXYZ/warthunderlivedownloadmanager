@@ -661,7 +661,10 @@ app.post('/api/storage/clean', (req, res) => {
     return res.status(404).json({ error: 'Modification folder not found.' });
   }
 
-  spaceSaved = cleanDirectory(targetPath);
+  spaceSaved = 0;
+  if (fs.statSync(targetPath).isDirectory()) {
+    spaceSaved = cleanDirectory(targetPath);
+  }
   res.json({
     success: true,
     spaceSaved,
@@ -728,16 +731,32 @@ app.post('/api/installed/toggle', (req, res) => {
 
   try {
     if (activeExists && !disabledExists) {
-      if (!fs.existsSync(disabledBaseDir)) {
-        fs.mkdirSync(disabledBaseDir, { recursive: true });
+      if (!fs.existsSync(path.dirname(disabledPath))) {
+        fs.mkdirSync(path.dirname(disabledPath), { recursive: true });
       }
       fs.renameSync(activePath, disabledPath);
+      // Also toggle metadata .wtlive.json next to it if it exists
+      if (activePath.endsWith('.blk')) {
+        const activeMeta = activePath.replace(/\.blk$/i, '.wtlive.json');
+        const disabledMeta = disabledPath.replace(/\.blk$/i, '.wtlive.json');
+        if (fs.existsSync(activeMeta)) {
+          fs.renameSync(activeMeta, disabledMeta);
+        }
+      }
       return res.json({ success: true, disabled: true, message: `${name} disabled successfully.` });
     } else if (disabledExists && !activeExists) {
-      if (!fs.existsSync(activeBaseDir)) {
-        fs.mkdirSync(activeBaseDir, { recursive: true });
+      if (!fs.existsSync(path.dirname(activePath))) {
+        fs.mkdirSync(path.dirname(activePath), { recursive: true });
       }
       fs.renameSync(disabledPath, activePath);
+      // Also toggle metadata .wtlive.json next to it if it exists
+      if (disabledPath.endsWith('.blk')) {
+        const activeMeta = activePath.replace(/\.blk$/i, '.wtlive.json');
+        const disabledMeta = disabledPath.replace(/\.blk$/i, '.wtlive.json');
+        if (fs.existsSync(disabledMeta)) {
+          fs.renameSync(disabledMeta, activeMeta);
+        }
+      }
       return res.json({ success: true, disabled: false, message: `${name} enabled successfully.` });
     } else if (activeExists && disabledExists) {
       return res.status(409).json({ error: `Conflict: both active and disabled folders exist for ${name}` });
@@ -800,6 +819,13 @@ app.delete('/api/installed', (req, res) => {
       fs.rmSync(pathToTarget, { recursive: true, force: true });
     } else {
       fs.unlinkSync(pathToTarget);
+      // Also delete metadata .wtlive.json next to it if it exists
+      if (pathToTarget.endsWith('.blk')) {
+        const metaPath = pathToTarget.replace(/\.blk$/i, '.wtlive.json');
+        if (fs.existsSync(metaPath)) {
+          try { fs.unlinkSync(metaPath); } catch (_) {}
+        }
+      }
     }
     res.json({ success: true, message: `${name} deleted successfully.` });
   } catch (err) {
@@ -1188,10 +1214,16 @@ app.post('/api/library/fix-sights', (req, res) => {
       for (const folder of folders) {
         const folderPath = path.join(baseDir, folder);
         if (fs.statSync(folderPath).isDirectory()) {
+          const lowerName = folder.toLowerCase();
+          if (lowerName === 'all_tanks' || lowerName.endsWith('_disabled') || folder.startsWith('.')) {
+            continue;
+          }
+
+          // First, check if there is a subfolder 'all_tanks' inside this directory and flatten it
           const nestedAllTanks = path.join(folderPath, 'all_tanks');
           if (fs.existsSync(nestedAllTanks) && fs.statSync(nestedAllTanks).isDirectory()) {
-            const files = fs.readdirSync(nestedAllTanks);
-            for (const file of files) {
+            const nestedFiles = fs.readdirSync(nestedAllTanks);
+            for (const file of nestedFiles) {
               const src = path.join(nestedAllTanks, file);
               const dest = path.join(folderPath, file);
               if (!fs.existsSync(dest)) {
@@ -1201,8 +1233,40 @@ app.post('/api/library/fix-sights', (req, res) => {
             try {
               fs.rmdirSync(nestedAllTanks);
             } catch (_) {}
-            movedCount++;
           }
+
+          // Second, move all .blk files from this folder directly up into baseDir (all_tanks)
+          const subfiles = fs.readdirSync(folderPath);
+          let blkMoved = false;
+          for (const file of subfiles) {
+            if (file.toLowerCase().endsWith('.blk')) {
+              const src = path.join(folderPath, file);
+              const dest = path.join(baseDir, file);
+              if (!fs.existsSync(dest)) {
+                fs.renameSync(src, dest);
+                movedCount++;
+                blkMoved = true;
+
+                // Also rename metadata .wtlive.json next to it if it exists or folder's metadata
+                const folderMeta = path.join(folderPath, '.wtlive.json');
+                const destMeta = dest.replace(/\.blk$/i, '.wtlive.json');
+                if (fs.existsSync(folderMeta)) {
+                  fs.renameSync(folderMeta, destMeta);
+                }
+              }
+            }
+          }
+
+          // If we moved files or if the folder is empty/only has wtlive config, try to delete it
+          try {
+            const remaining = fs.readdirSync(folderPath);
+            if (remaining.length === 0 || (remaining.length === 1 && remaining[0] === '.wtlive.json')) {
+              if (remaining[0] === '.wtlive.json') {
+                fs.unlinkSync(path.join(folderPath, '.wtlive.json'));
+              }
+              fs.rmdirSync(folderPath);
+            }
+          } catch (_) {}
         }
       }
     } catch (err) {

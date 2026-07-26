@@ -149,33 +149,68 @@ function scanInstalledSights(sightsPath) {
         const fullPath = path.join(dir, file);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
-          if (file.toLowerCase() === 'all_tanks') {
-            scan(fullPath, isDisabled);
+          const lowerName = file.toLowerCase();
+          if (lowerName === 'all_tanks') {
+            // Universal sights are flat .blk files directly inside all_tanks/
+            try {
+              const blkFiles = fs.readdirSync(fullPath);
+              for (const blkFile of blkFiles) {
+                if (blkFile.toLowerCase().endsWith('.blk')) {
+                  const blkPath = path.join(fullPath, blkFile);
+                  const blkStat = fs.statSync(blkPath);
+                  
+                  let metadata = null;
+                  const metaPath = blkPath.replace(/\.blk$/i, '.wtlive.json');
+                  if (fs.existsSync(metaPath)) {
+                    try {
+                      metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+                    } catch (_) {}
+                  }
+
+                  installedSights.push({
+                    name: blkFile,
+                    disabled: isDisabled,
+                    path: blkPath,
+                    installedAt: blkStat.mtimeMs || blkStat.mtime.getTime(),
+                    hasBlk: true,
+                    blkFiles: [blkFile],
+                    metadata
+                  });
+                }
+              }
+            } catch (_) {}
             continue;
           }
-          let metadata = null;
-          const metaPath = path.join(fullPath, '.wtlive.json');
-          if (fs.existsSync(metaPath)) {
-            try {
-              metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-            } catch (_) {}
+
+          if (lowerName.endsWith('_disabled') || file.startsWith('.')) {
+            continue;
           }
-          let blkFiles = [];
+
+          // Specific vehicle sights (e.g. UserSights/us_m56/)
+          let subfiles = [];
           try {
-            blkFiles = fs.readdirSync(fullPath)
-              .filter(f => f.toLowerCase().endsWith('.blk'))
-              .map(f => f.toLowerCase());
+            subfiles = fs.readdirSync(fullPath).filter(f => f.toLowerCase().endsWith('.blk'));
           } catch (_) {}
 
-          installedSights.push({
-            name: file,
-            disabled: isDisabled,
-            path: fullPath,
-            installedAt: stat.mtimeMs || stat.mtime.getTime(),
-            hasBlk: blkFiles.length > 0,
-            blkFiles,
-            metadata
-          });
+          if (subfiles.length > 0) {
+            let metadata = null;
+            const metaPath = path.join(fullPath, '.wtlive.json');
+            if (fs.existsSync(metaPath)) {
+              try {
+                metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+              } catch (_) {}
+            }
+
+            installedSights.push({
+              name: file,
+              disabled: isDisabled,
+              path: fullPath,
+              installedAt: stat.mtimeMs || stat.mtime.getTime(),
+              hasBlk: true,
+              blkFiles: subfiles,
+              metadata
+            });
+          }
         }
       }
     } catch (_) {}
@@ -196,6 +231,43 @@ function installLocalZip(tempZipPath, type, settings) {
     
   if (!fs.existsSync(targetBaseDir)) {
     fs.mkdirSync(targetBaseDir, { recursive: true });
+  }
+
+  const safeName = path.basename(tempZipPath);
+
+  if (type === 'sight') {
+    const zip = new AdmZip(tempZipPath);
+    const entries = zip.getEntries();
+    let blkFilesExtracted = [];
+
+    for (const entry of entries) {
+      if (!entry.isDirectory && entry.entryName.toLowerCase().endsWith('.blk')) {
+        const blkFilename = path.basename(entry.entryName);
+        const destPath = path.join(targetBaseDir, blkFilename);
+        fs.writeFileSync(destPath, entry.getData());
+        blkFilesExtracted.push(blkFilename);
+
+        // Write local metadata for this blk file next to it
+        const metaPath = destPath.replace(/\.blk$/i, '.wtlive.json');
+        const metadata = {
+          postId: `local_${Date.now()}`,
+          name: safeName,
+          title: blkFilename.replace(/\.blk$/i, ''),
+          url: '',
+          type,
+          image: '',
+          author: { nickname: 'Local File', avatar: '' },
+          lang_group: 0,
+          downloadedAt: Date.now()
+        };
+        try {
+          fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2), 'utf8');
+        } catch (_) {}
+      }
+    }
+
+    try { fs.unlinkSync(tempZipPath); } catch (_) {}
+    return blkFilesExtracted[0] || safeName;
   }
 
   const zip = new AdmZip(tempZipPath);
@@ -225,8 +297,6 @@ function installLocalZip(tempZipPath, type, settings) {
 
   let extractionPath = targetBaseDir;
   let createdFolder = '';
-
-  const safeName = path.basename(tempZipPath);
 
   if (zipHasWTFolderRoot) {
     const rootFolder = Array.from(rootFolders)[0];
