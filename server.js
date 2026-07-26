@@ -1181,16 +1181,47 @@ app.post('/api/library/fix-sights', (req, res) => {
     }
   };
 
+  const flattenNestedAllTanks = (baseDir) => {
+    if (!fs.existsSync(baseDir)) return;
+    try {
+      const folders = fs.readdirSync(baseDir);
+      for (const folder of folders) {
+        const folderPath = path.join(baseDir, folder);
+        if (fs.statSync(folderPath).isDirectory()) {
+          const nestedAllTanks = path.join(folderPath, 'all_tanks');
+          if (fs.existsSync(nestedAllTanks) && fs.statSync(nestedAllTanks).isDirectory()) {
+            const files = fs.readdirSync(nestedAllTanks);
+            for (const file of files) {
+              const src = path.join(nestedAllTanks, file);
+              const dest = path.join(folderPath, file);
+              if (!fs.existsSync(dest)) {
+                fs.renameSync(src, dest);
+              }
+            }
+            try {
+              fs.rmdirSync(nestedAllTanks);
+            } catch (_) {}
+            movedCount++;
+          }
+        }
+      }
+    } catch (err) {
+      logActivity(`Error flattening nested all_tanks: ${err.message}`, 'ERROR');
+    }
+  };
+
   // Fix active sights
   fixDir(settings.sightsPath);
+  flattenNestedAllTanks(path.join(settings.sightsPath, 'all_tanks'));
   
   // Fix disabled sights
   const disabledDir = settings.sightsPath + '_disabled';
   if (fs.existsSync(disabledDir)) {
     fixDir(disabledDir);
+    flattenNestedAllTanks(path.join(disabledDir, 'all_tanks'));
   }
 
-  logActivity(`Sights folder structure fixed. Moved ${movedCount} folders to all_tanks.`, 'INFO');
+  logActivity(`Sights folder structure fixed. Moved/flattened ${movedCount} folders.`, 'INFO');
   res.json({ success: true, movedCount });
 });
 

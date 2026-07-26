@@ -305,6 +305,28 @@ function installLocalZip(tempZipPath, type, settings) {
 
   // Write local metadata
   const metadataFolder = path.join(targetBaseDir, createdFolder);
+
+  // Clean up double-nested all_tanks subfolder if it exists
+  if (type === 'sight' && fs.existsSync(metadataFolder) && fs.statSync(metadataFolder).isDirectory()) {
+    const nestedAllTanks = path.join(metadataFolder, 'all_tanks');
+    if (fs.existsSync(nestedAllTanks) && fs.statSync(nestedAllTanks).isDirectory()) {
+      try {
+        const files = fs.readdirSync(nestedAllTanks);
+        for (const file of files) {
+          const src = path.join(nestedAllTanks, file);
+          const dest = path.join(metadataFolder, file);
+          if (!fs.existsSync(dest)) {
+            fs.renameSync(src, dest);
+          }
+        }
+        fs.rmdirSync(nestedAllTanks);
+        logActivity(`Automatically flattened nested all_tanks folder structure in ${createdFolder}`, 'INFO');
+      } catch (e) {
+        logActivity(`Failed to flatten nested all_tanks folder: ${e.message}`, 'ERROR');
+      }
+    }
+  }
+
   if (fs.existsSync(metadataFolder)) {
     const metaPath = path.join(metadataFolder, '.wtlive.json');
     const metadata = {
