@@ -225,10 +225,11 @@ function scanInstalledSights(sightsPath) {
 
   for (const sight of rawSights) {
     const postId = sight.metadata && sight.metadata.postId;
+    const postIdStr = postId ? String(postId) : '';
     // Group by postId if it exists and is an official WT Live download
-    if (postId && !postId.startsWith('local_')) {
-      if (groups.has(postId)) {
-        const existing = groups.get(postId);
+    if (postIdStr && !postIdStr.startsWith('local_')) {
+      if (groups.has(postIdStr)) {
+        const existing = groups.get(postIdStr);
         if (!existing.blkFiles.includes(sight.name)) {
           existing.blkFiles.push(sight.name);
         }
@@ -237,7 +238,7 @@ function scanInstalledSights(sightsPath) {
         existing.paths.push(sight.path);
       } else {
         sight.paths = [sight.path];
-        groups.set(postId, sight);
+        groups.set(postIdStr, sight);
       }
     } else {
       // For local or manually copied files, group by name prefix if they match
