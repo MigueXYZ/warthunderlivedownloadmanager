@@ -135,8 +135,8 @@ function scanInstalledSkins(wtPath) {
 
 // Scan installed sights
 function scanInstalledSights(sightsPath) {
-  const installedSights = [];
-  if (!sightsPath) return installedSights;
+  const rawSights = [];
+  if (!sightsPath) return rawSights;
 
   const activeSightsDir = sightsPath;
   const disabledSightsDir = sightsPath + '_disabled';
@@ -167,7 +167,7 @@ function scanInstalledSights(sightsPath) {
                     } catch (_) {}
                   }
 
-                  installedSights.push({
+                  rawSights.push({
                     name: blkFile,
                     disabled: isDisabled,
                     path: blkPath,
@@ -201,7 +201,7 @@ function scanInstalledSights(sightsPath) {
               } catch (_) {}
             }
 
-            installedSights.push({
+            rawSights.push({
               name: file,
               disabled: isDisabled,
               path: fullPath,
@@ -218,7 +218,72 @@ function scanInstalledSights(sightsPath) {
 
   scan(activeSightsDir, false);
   scan(disabledSightsDir, true);
-  return installedSights;
+
+  // Grouping logic to merge multi-file packs (e.g. Tiger_large/Tiger_medium/Tiger_small)
+  const groupedSights = [];
+  const groups = new Map(); // key -> groupedItem
+
+  for (const sight of rawSights) {
+    const postId = sight.metadata && sight.metadata.postId;
+    // Group by postId if it exists and is an official WT Live download
+    if (postId && !postId.startsWith('local_')) {
+      if (groups.has(postId)) {
+        const existing = groups.get(postId);
+        if (!existing.blkFiles.includes(sight.name)) {
+          existing.blkFiles.push(sight.name);
+        }
+        existing.installedAt = Math.max(existing.installedAt, sight.installedAt);
+        existing.paths = existing.paths || [existing.path];
+        existing.paths.push(sight.path);
+      } else {
+        sight.paths = [sight.path];
+        groups.set(postId, sight);
+      }
+    } else {
+      // For local or manually copied files, group by name prefix if they match
+      const nameWithoutExt = sight.name.replace(/\.blk$/i, '');
+      // Split on common delimiters like underscores, dashes, or digits
+      const prefix = nameWithoutExt.split(/[_\-\d]/)[0].toLowerCase();
+      
+      if (prefix && prefix.length > 2) {
+        if (groups.has(prefix)) {
+          const existing = groups.get(prefix);
+          if (!existing.blkFiles.includes(sight.name)) {
+            existing.blkFiles.push(sight.name);
+          }
+          existing.installedAt = Math.max(existing.installedAt, sight.installedAt);
+          existing.paths = existing.paths || [existing.path];
+          existing.paths.push(sight.path);
+          if (existing.metadata) {
+            existing.metadata.title = prefix.toUpperCase() + ' Sights Pack';
+          }
+        } else {
+          sight.paths = [sight.path];
+          if (!sight.metadata) {
+            sight.metadata = {
+              postId: `local_${prefix}`,
+              title: nameWithoutExt + ' Sight',
+              author: { nickname: 'Local File', avatar: '' }
+            };
+          }
+          groups.set(prefix, sight);
+        }
+      } else {
+        sight.paths = [sight.path];
+        groupedSights.push(sight);
+      }
+    }
+  }
+
+  // Collect grouped sights and join their names with commas
+  for (const group of groups.values()) {
+    if (group.paths && group.paths.length > 1) {
+      group.name = group.blkFiles.join(',');
+    }
+    groupedSights.push(group);
+  }
+
+  return groupedSights;
 }
 
 const AdmZip = require('adm-zip');

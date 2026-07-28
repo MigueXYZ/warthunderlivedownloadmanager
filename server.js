@@ -624,51 +624,54 @@ app.post('/api/storage/clean', (req, res) => {
     return res.status(400).json({ error: 'Missing parameters: name, type' });
   }
 
-  let folderPath = '';
-  let disabledFolderPath = '';
-  if (type === 'camouflage') {
-    if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
-    folderPath = path.join(settings.wtPath, 'UserSkins', name);
-    disabledFolderPath = path.join(settings.wtPath, 'UserSkins_disabled', name);
-  } else if (type === 'sight') {
-    if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
-    folderPath = path.join(settings.sightsPath, name);
-    if (!fs.existsSync(folderPath)) {
-      const allTanksPath = path.join(settings.sightsPath, 'all_tanks', name);
-      if (fs.existsSync(allTanksPath)) {
-        folderPath = allTanksPath;
+  const names = name.split(',');
+  let totalSaved = 0;
+
+  for (const singleName of names) {
+    let folderPath = '';
+    let disabledFolderPath = '';
+    if (type === 'camouflage') {
+      if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
+      folderPath = path.join(settings.wtPath, 'UserSkins', singleName);
+      disabledFolderPath = path.join(settings.wtPath, 'UserSkins_disabled', singleName);
+    } else if (type === 'sight') {
+      if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
+      folderPath = path.join(settings.sightsPath, singleName);
+      if (!fs.existsSync(folderPath)) {
+        const allTanksPath = path.join(settings.sightsPath, 'all_tanks', singleName);
+        if (fs.existsSync(allTanksPath)) {
+          folderPath = allTanksPath;
+        }
+      }
+      disabledFolderPath = path.join(settings.sightsPath + '_disabled', singleName);
+      if (!fs.existsSync(disabledFolderPath)) {
+        const allTanksDisabledPath = path.join(settings.sightsPath + '_disabled', 'all_tanks', singleName);
+        if (fs.existsSync(allTanksDisabledPath)) {
+          disabledFolderPath = allTanksDisabledPath;
+        }
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+
+    let targetPath = '';
+    if (fs.existsSync(folderPath)) {
+      targetPath = folderPath;
+    } else if (fs.existsSync(disabledFolderPath)) {
+      targetPath = disabledFolderPath;
+    }
+
+    if (targetPath) {
+      if (fs.statSync(targetPath).isDirectory()) {
+        totalSaved += cleanDirectory(targetPath);
       }
     }
-    disabledFolderPath = path.join(settings.sightsPath + '_disabled', name);
-    if (!fs.existsSync(disabledFolderPath)) {
-      const allTanksDisabledPath = path.join(settings.sightsPath + '_disabled', 'all_tanks', name);
-      if (fs.existsSync(allTanksDisabledPath)) {
-        disabledFolderPath = allTanksDisabledPath;
-      }
-    }
-  } else {
-    return res.status(400).json({ error: 'Invalid type' });
   }
 
-  let targetPath = '';
-  if (fs.existsSync(folderPath)) {
-    targetPath = folderPath;
-  } else if (fs.existsSync(disabledFolderPath)) {
-    targetPath = disabledFolderPath;
-  }
-
-  if (!targetPath) {
-    return res.status(404).json({ error: 'Modification folder not found.' });
-  }
-
-  spaceSaved = 0;
-  if (fs.statSync(targetPath).isDirectory()) {
-    spaceSaved = cleanDirectory(targetPath);
-  }
   res.json({
     success: true,
-    spaceSaved,
-    message: `Cleaned "${name}". Saved ${(spaceSaved / 1024 / 1024).toFixed(1)} MB.`
+    spaceSaved: totalSaved,
+    message: `Cleaned "${name}". Saved ${(totalSaved / 1024 / 1024).toFixed(1)} MB.`
   });
 });
 
@@ -693,75 +696,78 @@ app.post('/api/installed/toggle', (req, res) => {
     return res.status(400).json({ error: 'Missing parameters: type, name' });
   }
 
-  let activeBaseDir = '';
-  let disabledBaseDir = '';
-  if (type === 'camouflage') {
-    if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
-    activeBaseDir = path.join(settings.wtPath, 'UserSkins');
-    disabledBaseDir = path.join(settings.wtPath, 'UserSkins_disabled');
-  } else if (type === 'sight') {
-    if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
-    activeBaseDir = settings.sightsPath;
-    disabledBaseDir = settings.sightsPath + '_disabled';
-  } else {
-    return res.status(400).json({ error: 'Invalid type' });
-  }
-
-  let activePath = path.join(activeBaseDir, name);
-  let disabledPath = path.join(disabledBaseDir, name);
-
-  if (type === 'sight') {
-    const allTanksActive = path.join(activeBaseDir, 'all_tanks', name);
-    const allTanksDisabled = path.join(disabledBaseDir, 'all_tanks', name);
-    if (fs.existsSync(allTanksActive) || fs.existsSync(allTanksDisabled)) {
-      activePath = allTanksActive;
-      disabledPath = allTanksDisabled;
-      // Make sure the target all_tanks folder exists under disabledBaseDir/activeBaseDir
-      if (!fs.existsSync(path.dirname(activePath))) {
-        fs.mkdirSync(path.dirname(activePath), { recursive: true });
-      }
-      if (!fs.existsSync(path.dirname(disabledPath))) {
-        fs.mkdirSync(path.dirname(disabledPath), { recursive: true });
-      }
-    }
-  }
-
-  const activeExists = fs.existsSync(activePath);
-  const disabledExists = fs.existsSync(disabledPath);
-
   try {
-    if (activeExists && !disabledExists) {
-      if (!fs.existsSync(path.dirname(disabledPath))) {
-        fs.mkdirSync(path.dirname(disabledPath), { recursive: true });
-      }
-      fs.renameSync(activePath, disabledPath);
-      // Also toggle metadata .wtlive.json next to it if it exists
-      if (activePath.endsWith('.blk')) {
-        const activeMeta = activePath.replace(/\.blk$/i, '.wtlive.json');
-        const disabledMeta = disabledPath.replace(/\.blk$/i, '.wtlive.json');
-        if (fs.existsSync(activeMeta)) {
-          fs.renameSync(activeMeta, disabledMeta);
-        }
-      }
-      return res.json({ success: true, disabled: true, message: `${name} disabled successfully.` });
-    } else if (disabledExists && !activeExists) {
-      if (!fs.existsSync(path.dirname(activePath))) {
-        fs.mkdirSync(path.dirname(activePath), { recursive: true });
-      }
-      fs.renameSync(disabledPath, activePath);
-      // Also toggle metadata .wtlive.json next to it if it exists
-      if (disabledPath.endsWith('.blk')) {
-        const activeMeta = activePath.replace(/\.blk$/i, '.wtlive.json');
-        const disabledMeta = disabledPath.replace(/\.blk$/i, '.wtlive.json');
-        if (fs.existsSync(disabledMeta)) {
-          fs.renameSync(disabledMeta, activeMeta);
-        }
-      }
-      return res.json({ success: true, disabled: false, message: `${name} enabled successfully.` });
-    } else if (activeExists && disabledExists) {
-      return res.status(409).json({ error: `Conflict: both active and disabled folders exist for ${name}` });
+    let activeBaseDir = '';
+    let disabledBaseDir = '';
+    if (type === 'camouflage') {
+      if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
+      activeBaseDir = path.join(settings.wtPath, 'UserSkins');
+      disabledBaseDir = path.join(settings.wtPath, 'UserSkins_disabled');
+    } else if (type === 'sight') {
+      if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
+      activeBaseDir = settings.sightsPath;
+      disabledBaseDir = settings.sightsPath + '_disabled';
     } else {
-      return res.status(404).json({ error: `Modification folder not found for ${name}` });
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+
+    const names = name.split(',');
+    let successCount = 0;
+    let isNowDisabled = false;
+
+    for (const singleName of names) {
+      let activePath = path.join(activeBaseDir, singleName);
+      let disabledPath = path.join(disabledBaseDir, singleName);
+
+      if (type === 'sight') {
+        const allTanksActive = path.join(activeBaseDir, 'all_tanks', singleName);
+        const allTanksDisabled = path.join(disabledBaseDir, 'all_tanks', singleName);
+        if (fs.existsSync(allTanksActive) || fs.existsSync(allTanksDisabled)) {
+          activePath = allTanksActive;
+          disabledPath = allTanksDisabled;
+          if (!fs.existsSync(path.dirname(activePath))) {
+            fs.mkdirSync(path.dirname(activePath), { recursive: true });
+          }
+          if (!fs.existsSync(path.dirname(disabledPath))) {
+            fs.mkdirSync(path.dirname(disabledPath), { recursive: true });
+          }
+        }
+      }
+
+      const activeExists = fs.existsSync(activePath);
+      const disabledExists = fs.existsSync(disabledPath);
+
+      try {
+        if (activeExists && !disabledExists) {
+          fs.renameSync(activePath, disabledPath);
+          if (activePath.endsWith('.blk')) {
+            const activeMeta = activePath.replace(/\.blk$/i, '.wtlive.json');
+            const disabledMeta = disabledPath.replace(/\.blk$/i, '.wtlive.json');
+            if (fs.existsSync(activeMeta)) {
+              fs.renameSync(activeMeta, disabledMeta);
+            }
+          }
+          isNowDisabled = true;
+          successCount++;
+        } else if (disabledExists && !activeExists) {
+          fs.renameSync(disabledPath, activePath);
+          if (disabledPath.endsWith('.blk')) {
+            const activeMeta = activePath.replace(/\.blk$/i, '.wtlive.json');
+            const disabledMeta = disabledPath.replace(/\.blk$/i, '.wtlive.json');
+            if (fs.existsSync(disabledMeta)) {
+              fs.renameSync(disabledMeta, activeMeta);
+            }
+          }
+          isNowDisabled = false;
+          successCount++;
+        }
+      } catch (_) {}
+    }
+
+    if (successCount > 0) {
+      return res.json({ success: true, disabled: isNowDisabled, message: `Toggled ${successCount} files successfully.` });
+    } else {
+      return res.status(404).json({ error: `Modification folders/files not found for ${name}` });
     }
   } catch (err) {
     logActivity('Error toggling modification state: ' + err.message, 'ERROR');
@@ -778,59 +784,68 @@ app.delete('/api/installed', (req, res) => {
     return res.status(400).json({ error: 'Missing parameters: type, name' });
   }
 
-  let folderPath = '';
-  let disabledFolderPath = '';
-  if (type === 'camouflage') {
-    if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
-    folderPath = path.join(settings.wtPath, 'UserSkins', name);
-    disabledFolderPath = path.join(settings.wtPath, 'UserSkins_disabled', name);
-  } else if (type === 'sight') {
-    if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
-    folderPath = path.join(settings.sightsPath, name);
-    if (!fs.existsSync(folderPath)) {
-      const allTanksPath = path.join(settings.sightsPath, 'all_tanks', name);
-      if (fs.existsSync(allTanksPath)) {
-        folderPath = allTanksPath;
-      }
-    }
-    disabledFolderPath = path.join(settings.sightsPath + '_disabled', name);
-    if (!fs.existsSync(disabledFolderPath)) {
-      const allTanksDisabledPath = path.join(settings.sightsPath + '_disabled', 'all_tanks', name);
-      if (fs.existsSync(allTanksDisabledPath)) {
-        disabledFolderPath = allTanksDisabledPath;
-      }
-    }
-  } else {
-    return res.status(400).json({ error: 'Invalid type' });
-  }
+  const names = name.split(',');
+  let deletedCount = 0;
 
-  let pathToTarget = '';
-  if (fs.existsSync(folderPath)) {
-    pathToTarget = folderPath;
-  } else if (fs.existsSync(disabledFolderPath)) {
-    pathToTarget = disabledFolderPath;
-  } else {
-    return res.status(404).json({ error: 'Folder or file not found' });
-  }
-
-  try {
-    const stat = fs.statSync(pathToTarget);
-    if (stat.isDirectory()) {
-      fs.rmSync(pathToTarget, { recursive: true, force: true });
-    } else {
-      fs.unlinkSync(pathToTarget);
-      // Also delete metadata .wtlive.json next to it if it exists
-      if (pathToTarget.endsWith('.blk')) {
-        const metaPath = pathToTarget.replace(/\.blk$/i, '.wtlive.json');
-        if (fs.existsSync(metaPath)) {
-          try { fs.unlinkSync(metaPath); } catch (_) {}
+  for (const singleName of names) {
+    let folderPath = '';
+    let disabledFolderPath = '';
+    if (type === 'camouflage') {
+      if (!settings.wtPath) return res.status(400).json({ error: 'War Thunder path is not set.' });
+      folderPath = path.join(settings.wtPath, 'UserSkins', singleName);
+      disabledFolderPath = path.join(settings.wtPath, 'UserSkins_disabled', singleName);
+    } else if (type === 'sight') {
+      if (!settings.sightsPath) return res.status(400).json({ error: 'User Sights path is not set.' });
+      folderPath = path.join(settings.sightsPath, singleName);
+      if (!fs.existsSync(folderPath)) {
+        const allTanksPath = path.join(settings.sightsPath, 'all_tanks', singleName);
+        if (fs.existsSync(allTanksPath)) {
+          folderPath = allTanksPath;
         }
       }
+      disabledFolderPath = path.join(settings.sightsPath + '_disabled', singleName);
+      if (!fs.existsSync(disabledFolderPath)) {
+        const allTanksDisabledPath = path.join(settings.sightsPath + '_disabled', 'all_tanks', singleName);
+        if (fs.existsSync(allTanksDisabledPath)) {
+          disabledFolderPath = allTanksDisabledPath;
+        }
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid type' });
     }
-    res.json({ success: true, message: `${name} deleted successfully.` });
-  } catch (err) {
-    logActivity('Error deleting directory: ' + err.message, 'ERROR');
-    res.status(500).json({ error: `Delete failed: ${err.message}` });
+
+    let pathToTarget = '';
+    if (fs.existsSync(folderPath)) {
+      pathToTarget = folderPath;
+    } else if (fs.existsSync(disabledFolderPath)) {
+      pathToTarget = disabledFolderPath;
+    }
+
+    if (pathToTarget) {
+      try {
+        const stat = fs.statSync(pathToTarget);
+        if (stat.isDirectory()) {
+          fs.rmSync(pathToTarget, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(pathToTarget);
+          if (pathToTarget.endsWith('.blk')) {
+            const metaPath = pathToTarget.replace(/\.blk$/i, '.wtlive.json');
+            if (fs.existsSync(metaPath)) {
+              try { fs.unlinkSync(metaPath); } catch (_) {}
+            }
+          }
+        }
+        deletedCount++;
+      } catch (err) {
+        logActivity(`Error deleting ${singleName}: ` + err.message, 'ERROR');
+      }
+    }
+  }
+
+  if (deletedCount > 0) {
+    res.json({ success: true, message: `Deleted ${deletedCount} files successfully.` });
+  } else {
+    res.status(404).json({ error: 'Folder or file not found' });
   }
 });
 
