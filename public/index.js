@@ -1133,21 +1133,32 @@ function isModInstalled(item) {
   const filename = item.file.name;
   const cleanName = filename.replace(/\.(zip|rar|tar|gz)$/i, '').replace(/[^a-zA-Z0-9_\-\.]/g, '_').toLowerCase();
   
+  const matchesName = (installedName) => {
+    const name = installedName.replace(/\.[^/.]+$/, "").toLowerCase(); // strip extension
+    if (name === cleanName) return true;
+    
+    // Only use loose includes if both names are reasonably long to prevent false positives (like "a" matching "romanceplanet")
+    if (name.length > 3 && cleanName.length > 3) {
+      return name.includes(cleanName) || cleanName.includes(name);
+    }
+    return false;
+  };
+
   if (state.contentType === 'camouflage') {
     return state.installedList.skins.some(x => {
-      if (x.metadata && x.metadata.postId === item.id) {
+      if (x.metadata && String(x.metadata.postId) === String(item.id)) {
         return true;
       }
-      const name = x.name.replace(/\.[^/.]+$/, "").toLowerCase(); // strip extension
-      return name === cleanName || name.includes(cleanName) || cleanName.includes(name);
+      return matchesName(x.name);
     });
   } else {
     return state.installedList.sights.some(x => {
-      if (x.metadata && x.metadata.postId === item.id) {
+      if (x.metadata && String(x.metadata.postId) === String(item.id)) {
         return true;
       }
-      const name = x.name.replace(/\.[^/.]+$/, "").toLowerCase(); // strip extension
-      return name === cleanName || name.includes(cleanName) || cleanName.includes(name);
+      // Since sights can be a comma-separated list of files, split and check each
+      const parts = x.name.split(',');
+      return parts.some(part => matchesName(part));
     });
   }
 }
