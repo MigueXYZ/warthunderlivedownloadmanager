@@ -698,6 +698,31 @@
     </div>
   </div>
 
+  <!-- Add to Collection Picker Modal -->
+  <div class="overlay hidden" id="add-to-collection-overlay" onclick="closeAddToCollectionModal(event)">
+    <div class="overlay-card" onclick="event.stopPropagation()" style="max-width: 420px; width: 90%;">
+      <div class="gemini-gradient-bar"></div>
+      <div class="storage-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 20px;">📁</span>
+          <h2 style="font-family: var(--font-family-display); font-weight: 700;">Add to Collection</h2>
+        </div>
+        <button class="close-modal-btn" onclick="closeAddToCollectionModal()">&times;</button>
+      </div>
+      <div class="storage-modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; width: 100%;">
+        <input type="hidden" id="target-item-name-input" value="">
+        <p style="font-size: 13px; color: var(--text-muted); margin: 0;">Select a collection for <strong id="target-item-name-label" style="color: var(--accent-primary);">mod</strong>:</p>
+        <select id="target-collection-select" style="width: 100%; padding: 10px 14px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main); font-size: 13px;">
+          <!-- Dynamically filled with collections -->
+        </select>
+        <div class="gemini-modal-actions" style="border-top: none; padding-top: 12px; margin-top: 0; width: 100%; display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn-secondary" onclick="closeAddToCollectionModal()">Cancel</button>
+          <button class="btn-gemini-primary" onclick="confirmAddToCollection()">Add Item</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="index.js"></script>
 </body>
 </html>

@@ -125,17 +125,17 @@ app.post('/api/settings', (req, res) => {
     }
   }
 
-  const settings = { 
-    wtPath: cleanWT, 
-    sightsPath: cleanSights, 
-    cookie: cleanCookie,
-    blacklistTags: cleanBlacklist,
-    whitelistTags: cleanWhitelist,
-    limitPerDownload: dlLimit,
-    limitGlobal: gLimit,
-    verifyIntegrity: valIntegrity,
-    tempPath: cleanTemp
-  };
+  const settings = loadSettings();
+  settings.wtPath = cleanWT;
+  settings.sightsPath = cleanSights;
+  settings.cookie = cleanCookie;
+  settings.blacklistTags = cleanBlacklist;
+  settings.whitelistTags = cleanWhitelist;
+  settings.limitPerDownload = dlLimit;
+  settings.limitGlobal = gLimit;
+  settings.verifyIntegrity = valIntegrity;
+  settings.tempPath = cleanTemp;
+
   saveSettings(settings);
   ensureSubdirsExist(cleanWT, cleanSights);
 

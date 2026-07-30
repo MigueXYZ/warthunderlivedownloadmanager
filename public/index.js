@@ -3454,33 +3454,56 @@ async function bulkToggleCollection(id, targetState) {
   }
 }
 
-async function promptAddToCollection(itemName) {
+function promptAddToCollection(itemName) {
   if (state.collections.length === 0) {
     showToast('No collections created yet. Click "➕ New Collection" first!', 'warning');
     openCreateCollectionModal();
     return;
   }
 
-  const names = state.collections.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
-  const choice = prompt(`Select a collection number to add "${itemName}":\n\n${names}`);
-  if (!choice) return;
-  
-  const index = parseInt(choice, 10) - 1;
-  if (isNaN(index) || index < 0 || index >= state.collections.length) {
-    showToast('Invalid collection selection.', 'error');
-    return;
+  const modal = document.getElementById('add-to-collection-overlay');
+  const label = document.getElementById('target-item-name-label');
+  const input = document.getElementById('target-item-name-input');
+  const select = document.getElementById('target-collection-select');
+
+  if (label) label.textContent = itemName;
+  if (input) input.value = itemName;
+
+  if (select) {
+    select.innerHTML = '';
+    state.collections.forEach(col => {
+      const opt = document.createElement('option');
+      opt.value = col.id;
+      opt.textContent = `${col.name} (${(col.items || []).length} items)`;
+      select.appendChild(opt);
+    });
   }
 
-  const collection = state.collections[index];
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeAddToCollectionModal(event = null) {
+  if (event && event.target !== event.currentTarget) return;
+  const modal = document.getElementById('add-to-collection-overlay');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function confirmAddToCollection() {
+  const itemName = document.getElementById('target-item-name-input').value;
+  const collectionId = document.getElementById('target-collection-select').value;
+  if (!itemName || !collectionId) return;
+
+  const collection = state.collections.find(c => c.id === collectionId);
   try {
-    const res = await fetch(`/api/collections/${collection.id}/items`, {
+    const res = await fetch(`/api/collections/${collectionId}/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'add', itemName })
     });
     const data = await res.json();
     if (data.success) {
-      showToast(`Added "${itemName}" to "${collection.name}"! 📁`, 'success');
+      showToast(`Added "${itemName}" to "${collection ? collection.name : 'collection'}"! 📁`, 'success');
+      closeAddToCollectionModal();
       loadCollections();
     }
   } catch (err) {
@@ -3497,3 +3520,5 @@ window.saveCollection = saveCollection;
 window.deleteCollection = deleteCollection;
 window.bulkToggleCollection = bulkToggleCollection;
 window.promptAddToCollection = promptAddToCollection;
+window.closeAddToCollectionModal = closeAddToCollectionModal;
+window.confirmAddToCollection = confirmAddToCollection;
