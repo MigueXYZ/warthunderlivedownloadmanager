@@ -127,12 +127,11 @@ const elements = {
 };
 
 // Initial Setup
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initThemes();
-  loadSettings();
+  await loadSettings();
+  await loadFavorites();
   loadLibrary();
-  loadFavorites();
-  loadCollections();
   updateFilterVisibility();
   fetchFeed();
   checkSoftwareUpdate();
@@ -1058,7 +1057,7 @@ function renderCards(list) {
         </div>
       </div>
       <div class="card-footer" style="gap: 8px;">
-        <button class="btn-star-fav ${state.favorites.includes(String(item.id)) ? 'active' : ''}" onclick="toggleFavorite('${item.id}', this, event)" title="Toggle Favorite" style="margin-right: 4px;">⭐</button>
+        <button class="btn-star-fav ${state.favorites.includes(String(item.id)) ? 'active' : ''}" data-mod-id="${item.id}" onclick="toggleFavorite('${item.id}', this, event)" title="Toggle Favorite" style="margin-right: 4px;">⭐</button>
         <div class="file-info" style="flex: 1;">
           <span class="file-name" title="${item.file.name}">${item.file.name}</span>
           <span class="file-size">${sizeMb} MB</span>
@@ -1416,7 +1415,7 @@ function renderLibraryLists() {
       }
 
       const modId = metadata.postId ? String(metadata.postId) : skin.name;
-      const isFav = state.favorites.includes(modId);
+      const isFav = state.favorites.includes(modId) || state.favorites.includes(skin.name);
 
       const card = document.createElement('div');
       card.className = `lib-card ${skin.disabled ? 'disabled' : ''}`;
@@ -1441,8 +1440,7 @@ function renderLibraryLists() {
           </div>
           ${quickStatsHtml}
           <div class="lib-card-actions" onclick="event.stopPropagation()">
-            <button class="btn-star-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${modId}', this, event)" title="Toggle Favorite">⭐</button>
-            <button class="btn-secondary" onclick="promptAddToCollection('${skin.name}')" title="Add to Collection">📁</button>
+            <button class="btn-star-fav ${isFav ? 'active' : ''}" data-mod-id="${modId}" data-mod-name="${skin.name}" onclick="toggleFavorite('${modId}', this, event)" title="Toggle Favorite">⭐</button>
             ${updateBtnHtml}
             <button class="btn-secondary" onclick="openModDetailsModal('camouflage', '${skin.name}')">ℹ️ Details</button>
             <button class="btn-toggle ${skin.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('camouflage', '${skin.name}')">
@@ -1525,7 +1523,7 @@ function renderLibraryLists() {
       }
 
       const modId = metadata.postId ? String(metadata.postId) : sight.name;
-      const isFav = state.favorites.includes(modId);
+      const isFav = state.favorites.includes(modId) || state.favorites.includes(sight.name);
 
       const card = document.createElement('div');
       card.className = `lib-card ${sight.disabled ? 'disabled' : ''}`;
@@ -1547,8 +1545,7 @@ function renderLibraryLists() {
           </div>
           ${quickStatsHtml}
           <div class="lib-card-actions" onclick="event.stopPropagation()">
-            <button class="btn-star-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${modId}', this, event)" title="Toggle Favorite">⭐</button>
-            <button class="btn-secondary" onclick="promptAddToCollection('${sight.name}')" title="Add to Collection">📁</button>
+            <button class="btn-star-fav ${isFav ? 'active' : ''}" data-mod-id="${modId}" data-mod-name="${sight.name}" onclick="toggleFavorite('${modId}', this, event)" title="Toggle Favorite">⭐</button>
             ${updateBtnHtml}
             <button class="btn-secondary" onclick="openModDetailsModal('sight', '${sight.name}')">ℹ️ Details</button>
             <button class="btn-toggle ${sight.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('sight', '${sight.name}')">
@@ -3251,12 +3248,27 @@ async function fixSightsStructure(btn) {
 window.fixSightsStructure = fixSightsStructure;
 
 // Favorites Management
+function updateAllStarButtons() {
+  document.querySelectorAll('.btn-star-fav').forEach(btn => {
+    const modId = btn.getAttribute('data-mod-id');
+    const modName = btn.getAttribute('data-mod-name');
+    const isFav = (modId && state.favorites.includes(String(modId))) || 
+                  (modName && state.favorites.includes(String(modName)));
+    if (isFav) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
 async function loadFavorites() {
   try {
     const res = await fetch('/api/favorites');
     const data = await res.json();
     if (data.favorites) {
       state.favorites = data.favorites.map(x => String(x));
+      updateAllStarButtons();
     }
   } catch (err) {
     console.error('Failed to load favorites:', err);
@@ -3278,6 +3290,8 @@ async function toggleFavorite(id, btnElement = null, event = null) {
       const isFav = data.isFavorite;
       showToast(isFav ? 'Added to Favorites! ⭐' : 'Removed from Favorites.', 'info');
 
+      updateAllStarButtons();
+
       if (btnElement) {
         if (isFav) {
           btnElement.classList.add('active');
@@ -3286,7 +3300,6 @@ async function toggleFavorite(id, btnElement = null, event = null) {
         }
       }
 
-      // Re-filter library if favorites filter is active
       if (state.favoritesOnlyFilter) {
         filterLibrary();
       }
@@ -3310,215 +3323,7 @@ function toggleFavoritesFilter(btn) {
   filterLibrary();
 }
 
-// Collections Management
-async function loadCollections() {
-  try {
-    const res = await fetch('/api/collections');
-    const data = await res.json();
-    if (data.collections) {
-      state.collections = data.collections;
-      renderCollections();
-    }
-  } catch (err) {
-    console.error('Failed to load collections:', err);
-  }
-}
-
-function renderCollections() {
-  const grid = document.getElementById('collections-grid');
-  const countBadge = document.getElementById('count-collections');
-  if (!grid) return;
-  
-  if (countBadge) {
-    countBadge.textContent = state.collections.length;
-  }
-
-  grid.innerHTML = '';
-
-  if (state.collections.length === 0) {
-    grid.innerHTML = `
-      <div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 24px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); border-radius: var(--radius-md); width: 100%; grid-column: 1 / -1;">
-        📁 No custom collections yet. Click <strong>"➕ New Collection"</strong> above to group your modifications!
-      </div>
-    `;
-    return;
-  }
-
-  state.collections.forEach(col => {
-    const card = document.createElement('div');
-    card.className = 'collection-card';
-    const itemCount = (col.items || []).length;
-    const typeLabel = col.type === 'camouflage' ? 'Skins' : col.type === 'sight' ? 'Sights' : 'Mixed';
-
-    card.innerHTML = `
-      <div class="collection-card-header">
-        <div>
-          <h4 class="collection-card-title">${col.name}</h4>
-          ${col.description ? `<p class="collection-card-desc">${col.description}</p>` : ''}
-        </div>
-        <span class="badge" style="font-size: 10px; text-transform: uppercase;">${typeLabel}</span>
-      </div>
-      <div class="collection-card-meta">
-        <span>📦 ${itemCount} Item${itemCount === 1 ? '' : 's'}</span>
-      </div>
-      <div class="collection-card-actions">
-        <button class="btn-secondary" onclick="bulkToggleCollection('${col.id}', 'enable')" style="flex: 1; font-size: 11px; padding: 6px 10px;">✅ Enable All</button>
-        <button class="btn-secondary" onclick="bulkToggleCollection('${col.id}', 'disable')" style="flex: 1; font-size: 11px; padding: 6px 10px;">⏸️ Disable All</button>
-        <button class="btn-secondary" onclick="deleteCollection('${col.id}')" style="font-size: 11px; padding: 6px 10px; color: var(--accent-error);" title="Delete Collection">🗑️</button>
-      </div>
-    `;
-    grid.appendChild(card);
-  });
-}
-
-function openCreateCollectionModal() {
-  const modal = document.getElementById('collection-overlay');
-  const title = document.getElementById('collection-modal-title');
-  const editId = document.getElementById('collection-edit-id');
-  const nameInput = document.getElementById('collection-name-input');
-  const descInput = document.getElementById('collection-desc-input');
-
-  if (title) title.textContent = 'Create Custom Collection';
-  if (editId) editId.value = '';
-  if (nameInput) nameInput.value = '';
-  if (descInput) descInput.value = '';
-
-  if (modal) modal.classList.remove('hidden');
-}
-
-function closeCollectionModal(event = null) {
-  if (event && event.target !== event.currentTarget) return;
-  const modal = document.getElementById('collection-overlay');
-  if (modal) modal.classList.add('hidden');
-}
-
-async function saveCollection() {
-  const editId = document.getElementById('collection-edit-id').value;
-  const name = document.getElementById('collection-name-input').value.trim();
-  const description = document.getElementById('collection-desc-input').value.trim();
-  const type = document.getElementById('collection-type-select').value;
-
-  if (!name) {
-    showToast('Please enter a collection name.', 'warning');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/collections', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: editId || undefined, name, description, type })
-    });
-    const data = await res.json();
-    if (data.success) {
-      state.collections = data.collections || [];
-      renderCollections();
-      closeCollectionModal();
-      showToast(`Collection "${name}" saved! 📁`, 'success');
-    }
-  } catch (err) {
-    showToast('Failed to save collection: ' + err.message, 'error');
-  }
-}
-
-async function deleteCollection(id) {
-  if (!confirm('Are you sure you want to delete this collection? Installed files will not be deleted from disk.')) return;
-  try {
-    const res = await fetch(`/api/collections/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      state.collections = data.collections || [];
-      renderCollections();
-      showToast('Collection deleted.', 'info');
-    }
-  } catch (err) {
-    showToast('Failed to delete collection: ' + err.message, 'error');
-  }
-}
-
-async function bulkToggleCollection(id, targetState) {
-  try {
-    showToast(`Updating modifications in collection...`, 'info');
-    const res = await fetch(`/api/collections/${id}/bulk-toggle`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetState })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(data.message || `Collection updated!`, 'success');
-      loadLibrary();
-    }
-  } catch (err) {
-    showToast('Failed to toggle collection: ' + err.message, 'error');
-  }
-}
-
-function promptAddToCollection(itemName) {
-  if (state.collections.length === 0) {
-    showToast('No collections created yet. Click "➕ New Collection" first!', 'warning');
-    openCreateCollectionModal();
-    return;
-  }
-
-  const modal = document.getElementById('add-to-collection-overlay');
-  const label = document.getElementById('target-item-name-label');
-  const input = document.getElementById('target-item-name-input');
-  const select = document.getElementById('target-collection-select');
-
-  if (label) label.textContent = itemName;
-  if (input) input.value = itemName;
-
-  if (select) {
-    select.innerHTML = '';
-    state.collections.forEach(col => {
-      const opt = document.createElement('option');
-      opt.value = col.id;
-      opt.textContent = `${col.name} (${(col.items || []).length} items)`;
-      select.appendChild(opt);
-    });
-  }
-
-  if (modal) modal.classList.remove('hidden');
-}
-
-function closeAddToCollectionModal(event = null) {
-  if (event && event.target !== event.currentTarget) return;
-  const modal = document.getElementById('add-to-collection-overlay');
-  if (modal) modal.classList.add('hidden');
-}
-
-async function confirmAddToCollection() {
-  const itemName = document.getElementById('target-item-name-input').value;
-  const collectionId = document.getElementById('target-collection-select').value;
-  if (!itemName || !collectionId) return;
-
-  const collection = state.collections.find(c => c.id === collectionId);
-  try {
-    const res = await fetch(`/api/collections/${collectionId}/items`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add', itemName })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(`Added "${itemName}" to "${collection ? collection.name : 'collection'}"! 📁`, 'success');
-      closeAddToCollectionModal();
-      loadCollections();
-    }
-  } catch (err) {
-    showToast('Failed to add to collection: ' + err.message, 'error');
-  }
-}
-
 // Make functions globally available
 window.toggleFavorite = toggleFavorite;
 window.toggleFavoritesFilter = toggleFavoritesFilter;
-window.openCreateCollectionModal = openCreateCollectionModal;
-window.closeCollectionModal = closeCollectionModal;
-window.saveCollection = saveCollection;
-window.deleteCollection = deleteCollection;
-window.bulkToggleCollection = bulkToggleCollection;
-window.promptAddToCollection = promptAddToCollection;
-window.closeAddToCollectionModal = closeAddToCollectionModal;
-window.confirmAddToCollection = confirmAddToCollection;
+window.loadFavorites = loadFavorites;
