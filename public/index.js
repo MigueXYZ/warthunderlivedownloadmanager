@@ -3252,12 +3252,15 @@ function updateAllStarButtons() {
   document.querySelectorAll('.btn-star-fav').forEach(btn => {
     const modId = btn.getAttribute('data-mod-id');
     const modName = btn.getAttribute('data-mod-name');
+    const card = btn.closest('.lib-card');
     const isFav = (modId && state.favorites.includes(String(modId))) || 
                   (modName && state.favorites.includes(String(modName)));
     if (isFav) {
       btn.classList.add('active');
+      if (card) card.setAttribute('data-is-fav', 'true');
     } else {
       btn.classList.remove('active');
+      if (card) card.setAttribute('data-is-fav', 'false');
     }
   });
 }
