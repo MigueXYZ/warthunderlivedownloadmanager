@@ -1,65 +1,60 @@
 # War Thunder Live Downloader & Manager ✈️📦
 
-A premium, local desktop-assisted web application that connects to `live.warthunder.com` to search, download, and automatically install custom skins (camouflages) and sights directly into your folders.
+![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20x64-brightgreen.svg)
+![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-No more manual downloading, extracting, renaming, and copying zip files!
+A premium, high-performance desktop application for **War Thunder** players to search, download, favorite, and automatically install custom camouflages (skins) and sights directly into the game.
 
----
-
-## ✨ Features
-
-*   🔍 **Seamless WT Live Feed Integration**: Browse skins and sights directly from the app, sorted by popularity, downloads, comments, or date.
-*   ⚡ **One-Click Installation**: Simply click "Install" and the backend downloads, extracts, and organizes the folders in your `UserSkins` or `UserSights` directory.
-*   🧹 **Intelligent ZIP Extraction**: WT Live creators package their zips in many different ways. This app inspects the structure and extracts them cleanly—preventing files from being dumped directly in the root folders.
-*   🔓 **Unlock Restricted Content**: Option to paste your Gaijin Session Cookie (`identity_sid`) to browse anime, historical, or restricted mods that Gaijin filters out for unauthenticated visitors.
-*   🎮 **Active Vehicle Companion**: Automatically polls War Thunder's telemetry engine (`http://localhost:8111`) while the game is running. When you enter a match or test flight, it displays your active vehicle and offers a one-click button to search top-rated skins/sights for it.
-*   🗑️ **Library Management**: View all custom skins and sights currently installed on your PC, with one-click deletion to free up disk space.
+No more manual zip downloading, extracting, folder renaming, or permissions errors!
 
 ---
 
-## 🚀 How to Run the App
+## ✨ Key Features (v1.5.0)
 
-### Standard Run (Visible terminal)
-1.  Open your terminal inside this project directory.
-2.  Start the local server by running:
-    ```bash
-    npm start
-    ```
-    *(If script execution policies block npm on Windows, run `npm.cmd start` or `node server.js` instead).*
-3.  Open your browser and navigate to:
-    **[http://localhost:3000](http://localhost:3000)**
-
-### Background Run (Windows)
-If you prefer to run the application invisibly in the background without keeping a command prompt window open:
-1.  Double-click [start_background.bat](file:///E:/DEV/Projects/warthunderlivedownloadmanager/start_background.bat) in the project root.
-2.  Open your browser and navigate to: **[http://localhost:3000](http://localhost:3000)**
-3.  To stop the application, double-click [stop_background.bat](file:///E:/DEV/Projects/warthunderlivedownloadmanager/stop_background.bat) to terminate the process.
+* ⚡ **1-Click Auto-Updater**: Built-in update engine checks GitHub Releases automatically and installs app updates directly from the dashboard.
+* ⭐ **Favorites System**: Star any skin or sight from the live feed or installed library to build your personal collection and filter with `⭐ Favorites Only`.
+* 🎯 **Smart Auto-Detection**: Automatically scans all drive letters (`A-Z`) to find Steam and standalone War Thunder installations, as well as `production\UserSights` save folders.
+* 🎮 **Real-Time Telemetry Companion**: Connects with War Thunder's live web engine (`localhost:8111`) while in battle or test flight to display your active vehicle and find matching modifications with one click.
+* 🧹 **Intelligent Archive Extraction**: Handles complex `.zip` archives automatically, cleanly placing skins in `UserSkins` and sights in `UserSights\all_tanks`.
+* 🔒 **User Temp Directory Protection**: Resolves Windows `Program Files` permission restrictions by isolating downloads inside user `%TEMP%` storage.
+* 🔓 **Session Cookie Integration**: Option to input your Gaijin session cookie (`identity_sid`) to unlock restricted, historical, or authentic camouflage content on WT Live.
+* 🛠️ **Sights Structure Repair**: Built-in 1-click repair utility to move loose sight `.blk` files into the required `all_tanks` directory.
 
 ---
 
-## 🛠️ First-Time Setup
+## 💻 Installation & Usage
 
-Once you open the web UI, you will find three input fields at the top of the page:
+### Method 1: Desktop App (Recommended)
+1. Download the latest installer `warthunderlivedownloadmanager_1.5.0_x64-setup.exe` from [GitHub Releases](https://github.com/MigueXYZ/warthunderlivedownloadmanager/releases).
+2. Run the installer and launch **War Thunder Live Manager**.
+3. The app will auto-detect your War Thunder installation and sights path.
 
-1.  **Game Folder**: Set this to your main War Thunder game installation path (e.g. `C:\Program Files (x86)\Steam\steamapps\common\War Thunder`). Custom skins will be automatically installed in this directory under `UserSkins`.
-2.  **Sights Folder**: Set this to your modern War Thunder custom saves directory under Documents. The application automatically attempts to find this for you, looking under:
-    `C:\Users\<YourUserName>\Documents\My Games\WarThunder\Saves\<YourUserID>\production\UserSights`
-    Custom sights will be extracted directly here inside the `all_tanks` folder.
-3.  **Session Cookie (Optional)**: If you want to see all posts on the website (including restricted/nsfw/historical mods), you can paste your `identity_sid` session cookie.
-    *   **How to get it**:
-        1. Log in to `live.warthunder.com` in your browser.
-        2. Press **F12** on your keyboard to open Developer Tools.
-        3. Navigate to the **Application** tab (Chrome/Edge) or **Storage** tab (Firefox).
-        4. Expand **Cookies** on the left menu and select `https://live.warthunder.com`.
-        5. Look for the cookie named `identity_sid`, copy its **Value**, and paste it into the app settings.
-
-Click **Save Settings** to verify and save all configurations.
+### Method 2: Development / Source Mode
+1. Clone the repository and install Node.js dependencies:
+   ```bash
+   git clone https://github.com/MigueXYZ/warthunderlivedownloadmanager.git
+   cd warthunderlivedownloadmanager
+   npm install
+   ```
+2. Launch dev mode using Tauri:
+   ```bash
+   npm run tauri dev
+   ```
 
 ---
 
-## ⚙️ How Telemetry Tracking Works
+## ⚙️ Configuration & Setup
 
-1.  Launch **War Thunder**.
-2.  Start a Match, Custom Battle, or Test Flight.
-3.  The sidebar's status panel will turn green and say **WT Client Active**.
-4.  Click **Find Skins & Sights** to immediately list all WT Live creations for your active vehicle!
+Upon opening the app, check the **Settings** panel (⚙️):
+
+1. **Game Folder**: Main War Thunder folder (e.g., `H:\SteamLibrary\steamapps\common\War Thunder`).
+2. **Sights Folder**: Target saves folder for custom tank sights (e.g., `C:\Users\<User>\Documents\My Games\WarThunder\Saves\<UserID>\production\UserSights`).
+3. **Session Cookie (Optional)**: Paste your `identity_sid` cookie from `live.warthunder.com` (press `F12` -> Application -> Cookies) to view age-restricted or historical posts.
+
+---
+
+## 📜 License & Acknowledgments
+
+Distributed under the MIT License. Developed for the War Thunder community.
+Special thanks to Gaijin Entertainment and WT Live creators.
