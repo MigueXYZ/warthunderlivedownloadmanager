@@ -564,6 +564,62 @@ async function checkSoftwareUpdate(forceMock = false, isManual = false) {
   }
 }
 
+// Perform automatic software update
+async function performAutoUpdate() {
+  const btnAutoUpdate = document.getElementById('btn-auto-update');
+  const appUpdateLink = document.getElementById('app-update-link');
+  const appUpdateTitle = document.getElementById('app-update-title');
+  const appUpdateText = document.getElementById('app-update-text');
+
+  if (btnAutoUpdate) btnAutoUpdate.disabled = true;
+  if (appUpdateLink) appUpdateLink.classList.add('disabled');
+  if (appUpdateTitle) appUpdateTitle.textContent = 'Updating...';
+  if (appUpdateText) appUpdateText.textContent = 'Downloading and installing the update. Please wait...';
+
+  showToast('Starting software auto-update. Downloading installer...', 'info');
+
+  try {
+    const res = await fetch('/api/software/update', {
+      method: 'POST'
+    });
+    const data = await res.json();
+    
+    if (res.ok && data.success) {
+      showToast('Update downloaded. Launching installer and shutting down...', 'success');
+      if (appUpdateText) appUpdateText.textContent = 'Installer launched. Application is shutting down.';
+      
+      // Wait briefly, then close the window
+      setTimeout(() => {
+        try {
+          if (window.__TAURI__) {
+            if (window.__TAURI__.window && window.__TAURI__.window.getCurrentWindow) {
+              window.__TAURI__.window.getCurrentWindow().close();
+            } else if (window.__TAURI__.process && window.__TAURI__.process.exit) {
+              window.__TAURI__.process.exit(0);
+            } else {
+              window.close();
+            }
+          } else {
+            window.close();
+          }
+        } catch (_) {
+          window.close();
+        }
+      }, 2000);
+    } else {
+      throw new Error(data.error || 'Server returned an error.');
+    }
+  } catch (err) {
+    console.error('Auto-update failed:', err);
+    showToast(`Auto-update failed: ${err.message}`, 'error');
+    
+    if (btnAutoUpdate) btnAutoUpdate.disabled = false;
+    if (appUpdateLink) appUpdateLink.classList.remove('disabled');
+    if (appUpdateTitle) appUpdateTitle.textContent = 'Update Available';
+    if (appUpdateText) appUpdateText.textContent = 'Failed to install automatically. Please try again or download manually.';
+  }
+}
+
 // API: Load Settings
 async function loadSettings() {
   try {

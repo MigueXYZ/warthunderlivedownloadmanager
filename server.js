@@ -1092,6 +1092,77 @@ app.get('/api/software/check-update', async (req, res) => {
   }
 });
 
+// API: Perform software auto-update by downloading and launching setup.exe
+app.post('/api/software/update', async (req, res) => {
+  const { spawn } = require('child_process');
+  const { Readable } = require('stream');
+  const { finished } = require('stream/promises');
+
+  try {
+    const response = await fetch('https://api.github.com/repos/MigueXYZ/warthunderlivedownloadmanager/releases/latest', {
+      headers: {
+        'User-Agent': 'warthunderlivedownloadmanager-updater'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub API returned status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const assets = data.assets || [];
+    
+    // Find the installer asset (.exe or .msi)
+    const installerAsset = assets.find(asset => 
+      asset.name.endsWith('-setup.exe') || 
+      asset.name.endsWith('.msi') || 
+      asset.name.endsWith('.exe')
+    );
+
+    if (!installerAsset) {
+      return res.status(404).json({ error: 'No installer executable asset found in the latest release.' });
+    }
+
+    logActivity(`Downloading update from: ${installerAsset.browser_download_url}`, 'INFO');
+    
+    const downloadRes = await fetch(installerAsset.browser_download_url);
+    if (!downloadRes.ok) {
+      throw new Error(`Failed to download installer from GitHub, status: ${downloadRes.status}`);
+    }
+
+    const tempDir = path.join(process.env.TEMP || 'C:\\temp', 'wt-live-manager-updates');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const tempFilePath = path.join(tempDir, installerAsset.name);
+    const fileStream = fs.createWriteStream(tempFilePath);
+    
+    // Pipe response body to file stream
+    await finished(Readable.fromWeb(downloadRes.body).pipe(fileStream));
+    
+    logActivity(`Update installer downloaded to: ${tempFilePath}. Launching installer...`, 'INFO');
+
+    // Run the installer as a detached child process
+    const child = spawn(tempFilePath, [], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
+
+    res.json({ success: true, message: 'Installer launched successfully. Application is shutting down to update.' });
+
+    // Exit backend process so installer can replace files
+    setTimeout(() => {
+      process.exit(0);
+    }, 1000);
+
+  } catch (err) {
+    logActivity('Error executing auto-update: ' + err.message, 'ERROR');
+    res.status(500).json({ error: 'Auto-update failed: ' + err.message });
+  }
+});
+
 // API: Get recent activity logs
 app.get('/api/logs', (req, res) => {
   if (!fs.existsSync(logFilePath)) {

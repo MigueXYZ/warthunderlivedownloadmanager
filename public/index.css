@@ -2391,5 +2391,36 @@ body.theme-japan {
   transform: scale(1.2);
 }
 
+.update-card-action-secondary {
+  display: block;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted) !important;
+  font-weight: 700;
+  font-size: 11px;
+  text-decoration: none !important;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.update-card-action-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main) !important;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.update-card-action:disabled,
+.update-card-action-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 
 
