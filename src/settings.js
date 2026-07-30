@@ -21,8 +21,14 @@ function loadSettings() {
   if (!settings.wtPath) {
     settings.wtPath = autoDetectWTPath();
   }
+  if (settings.wtPath && fs.existsSync(path.join(settings.wtPath, 'War Thunder'))) {
+    settings.wtPath = path.join(settings.wtPath, 'War Thunder');
+  }
   if (!settings.sightsPath) {
     settings.sightsPath = autoDetectUserSightsPath();
+  }
+  if (!settings.tempPath) {
+    settings.tempPath = path.join(baseDir, 'temp');
   }
   if (!Array.isArray(settings.favorites)) {
     settings.favorites = [];
@@ -36,27 +42,34 @@ function loadSettings() {
 // Helper to save settings
 function saveSettings(settings) {
   try {
+    if (settings.wtPath && fs.existsSync(path.join(settings.wtPath, 'War Thunder'))) {
+      settings.wtPath = path.join(settings.wtPath, 'War Thunder');
+    }
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
   } catch (e) {
     logActivity('Error writing settings file: ' + e.message, 'ERROR');
   }
 }
 
-// Automatically detect War Thunder installation path on Windows
+// Automatically detect War Thunder installation path on Windows across all drive letters
 function autoDetectWTPath() {
-  const possiblePaths = [
-    'C:\\Program Files (x86)\\Steam\\steamapps\\common\\War Thunder',
-    'C:\\Program Files\\Steam\\steamapps\\common\\War Thunder',
-    'D:\\SteamLibrary\\steamapps\\common\\War Thunder',
-    'E:\\SteamLibrary\\steamapps\\common\\War Thunder',
-    'C:\\WarThunder',
-    'D:\\WarThunder',
-    'C:\\AppData\\Local\\WarThunder'
+  const drives = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+  const subPaths = [
+    'SteamLibrary\\steamapps\\common\\War Thunder',
+    'Program Files (x86)\\Steam\\steamapps\\common\\War Thunder',
+    'Program Files\\Steam\\steamapps\\common\\War Thunder',
+    'WarThunder',
+    'Games\\WarThunder',
+    'Games\\War Thunder',
+    'AppData\\Local\\WarThunder'
   ];
 
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      return p;
+  for (const drive of drives) {
+    for (const sub of subPaths) {
+      const fullPath = `${drive}:\\${sub}`;
+      if (fs.existsSync(fullPath)) {
+        return fullPath;
+      }
     }
   }
   return '';

@@ -723,7 +723,12 @@ async function loadSettings() {
 
 // API: Save Settings
 async function saveSettings() {
-  const wtPath = elements.wtPathInput.value.trim();
+  let wtPath = elements.wtPathInput.value.trim();
+  if (wtPath.toLowerCase().endsWith('common') || wtPath.toLowerCase().endsWith('common\\') || wtPath.toLowerCase().endsWith('common/')) {
+    wtPath = wtPath.replace(/[\\/]+$/, '') + '\\War Thunder';
+    elements.wtPathInput.value = wtPath;
+  }
+
   const sightsPath = elements.sightsPathInput.value.trim();
   const tempPath = elements.tempPathInput ? elements.tempPathInput.value.trim() : '';
   const cookie = elements.cookieInput.value.trim();
