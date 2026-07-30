@@ -1016,12 +1016,12 @@ app.get('/api/telemetry', async (req, res) => {
 app.get('/api/software/check-update', async (req, res) => {
   const forceMock = req.query.force === 'true';
   const pkgPath = path.join(__dirname, 'package.json');
-  let currentVersion = '1.0.0';
+  let currentVersion = '1.5.0';
   
   try {
     if (fs.existsSync(pkgPath)) {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      currentVersion = pkg.version || '1.0.0';
+      currentVersion = pkg.version || '1.5.0';
     }
   } catch (err) {
     logActivity('Error reading package.json version: ' + err.message, 'ERROR');
