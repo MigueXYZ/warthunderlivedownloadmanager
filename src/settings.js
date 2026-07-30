@@ -6,6 +6,11 @@ const isPkg = typeof process.pkg !== 'undefined';
 const baseDir = isPkg ? path.dirname(process.execPath) : path.join(__dirname, '..');
 const SETTINGS_FILE = path.join(baseDir, 'settings.json');
 
+function getDefaultTempPath() {
+  const userTemp = process.env.TEMP || process.env.LOCALAPPDATA || 'C:\\temp';
+  return path.join(userTemp, 'wt-live-manager-temp');
+}
+
 // Helper to load settings
 function loadSettings() {
   let settings = { wtPath: '', sightsPath: '', cookie: '', blacklistTags: '', whitelistTags: '', limitPerDownload: 0, limitGlobal: 0, verifyIntegrity: true, tempPath: '' };
@@ -27,8 +32,8 @@ function loadSettings() {
   if (!settings.sightsPath) {
     settings.sightsPath = autoDetectUserSightsPath();
   }
-  if (!settings.tempPath) {
-    settings.tempPath = path.join(baseDir, 'temp');
+  if (!settings.tempPath || settings.tempPath.includes('Program Files')) {
+    settings.tempPath = getDefaultTempPath();
   }
   if (!Array.isArray(settings.favorites)) {
     settings.favorites = [];
@@ -132,6 +137,7 @@ module.exports = {
   saveSettings,
   autoDetectWTPath,
   autoDetectUserSightsPath,
+  getDefaultTempPath,
   ensureSubdirsExist,
   SETTINGS_FILE
 };

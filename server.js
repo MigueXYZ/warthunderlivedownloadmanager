@@ -61,15 +61,15 @@ app.get('/api/settings', async (req, res) => {
 
   const { autoDetectWTPath, autoDetectUserSightsPath } = require('./src/settings');
   res.json({
-    wtPath: settings.wtPath,
-    sightsPath: settings.sightsPath,
+    wtPath: settings.wtPath || '',
+    sightsPath: settings.sightsPath || '',
     cookie: settings.cookie || '',
     blacklistTags: settings.blacklistTags || '',
     whitelistTags: settings.whitelistTags || '',
     limitPerDownload: settings.limitPerDownload || 0,
     limitGlobal: settings.limitGlobal || 0,
     verifyIntegrity: settings.verifyIntegrity !== false,
-    tempPath: settings.tempPath || '',
+    tempPath: settings.tempPath || getDefaultTempPath(),
     detectedWT: autoDetectWTPath(),
     detectedSights: autoDetectUserSightsPath(),
     isWTValid: settings.wtPath ? fs.existsSync(settings.wtPath) : false,
@@ -87,7 +87,11 @@ app.post('/api/settings', (req, res) => {
   const cleanCookie = cookie ? cookie.trim() : '';
   const cleanBlacklist = blacklistTags ? blacklistTags.trim() : '';
   const cleanWhitelist = whitelistTags ? whitelistTags.trim() : '';
-  const cleanTemp = tempPath ? tempPath.trim() : '';
+  let cleanTemp = tempPath ? tempPath.trim() : '';
+  if (!cleanTemp || cleanTemp.includes('Program Files')) {
+    cleanTemp = getDefaultTempPath();
+  }
+
   const dlLimit = parseInt(limitPerDownload, 10) || 0;
   const gLimit = parseInt(limitGlobal, 10) || 0;
   const valIntegrity = verifyIntegrity !== false;
@@ -112,7 +116,12 @@ app.post('/api/settings', (req, res) => {
         fs.mkdirSync(cleanTemp, { recursive: true });
       }
     } catch (e) {
-      return res.status(400).json({ error: 'Failed to access or create the custom temp directory.' });
+      cleanTemp = getDefaultTempPath();
+      try {
+        if (!fs.existsSync(cleanTemp)) {
+          fs.mkdirSync(cleanTemp, { recursive: true });
+        }
+      } catch (_) {}
     }
   }
 
