@@ -169,7 +169,9 @@
       <section class="tab-content" id="tab-library">
         <div class="library-header">
           <h2>Installed Modifications</h2>
-          <div style="display: flex; gap: 12px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn-secondary" id="btn-fav-filter" onclick="toggleFavoritesFilter(this)">⭐ Favorites Only</button>
+            <button class="btn-secondary" id="btn-create-collection" onclick="openCreateCollectionModal()">➕ New Collection</button>
             <button class="btn-secondary" id="btn-analyze-storage" onclick="openStorageModal()">🧹 Analyze Storage</button>
             <button class="btn-secondary" id="btn-check-updates" onclick="checkUpdates(this)">🔄 Check Updates</button>
             <button class="btn-secondary" onclick="fixSightsStructure(this)">🔧 Fix Sights</button>
@@ -180,6 +182,18 @@
         <!-- Library Search Bar -->
         <div class="search-bar-wrapper" style="margin-bottom: 24px;">
           <input type="text" id="library-search-input" placeholder="🔍 Search installed skins or sights by name or author..." oninput="filterLibrary()">
+        </div>
+
+        <!-- Collections Section -->
+        <div id="collections-section" class="collections-section" style="margin-bottom: 24px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
+              📁 Custom Collections <span class="badge" id="count-collections">0</span>
+            </h3>
+          </div>
+          <div class="collections-grid" id="collections-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+            <!-- Dynamically populated collection cards -->
+          </div>
         </div>
 
         <!-- Library Active Vehicle Filter -->
@@ -642,6 +656,43 @@
             <span>📥</span> Download Log File
           </a>
           <button class="btn-gemini-primary" onclick="closeLogsModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Collection Creation Modal -->
+  <div class="overlay hidden" id="collection-overlay" onclick="closeCollectionModal(event)">
+    <div class="overlay-card" onclick="event.stopPropagation()" style="max-width: 480px; width: 90%;">
+      <div class="gemini-gradient-bar"></div>
+      <div class="storage-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 20px;">📁</span>
+          <h2 style="font-family: var(--font-family-display); font-weight: 700;" id="collection-modal-title">Create Custom Collection</h2>
+        </div>
+        <button class="close-modal-btn" onclick="closeCollectionModal()">&times;</button>
+      </div>
+      <div class="storage-modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; width: 100%;">
+        <input type="hidden" id="collection-edit-id" value="">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Collection Name</label>
+          <input type="text" id="collection-name-input" placeholder="e.g. Tournament Skins, Top Tier Sights..." style="width: 100%; padding: 10px 14px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main); font-size: 13px;">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Description (Optional)</label>
+          <input type="text" id="collection-desc-input" placeholder="e.g. My favorite camouflages for realistic battles" style="width: 100%; padding: 10px 14px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main); font-size: 13px;">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Type</label>
+          <select id="collection-type-select" style="width: 100%; padding: 10px 14px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main); font-size: 13px;">
+            <option value="all">All Modification Types</option>
+            <option value="camouflage">Skins Only</option>
+            <option value="sight">Sights Only</option>
+          </select>
+        </div>
+        <div class="gemini-modal-actions" style="border-top: none; padding-top: 12px; margin-top: 0; width: 100%; display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn-secondary" onclick="closeCollectionModal()">Cancel</button>
+          <button class="btn-gemini-primary" onclick="saveCollection()">Save Collection</button>
         </div>
       </div>
     </div>

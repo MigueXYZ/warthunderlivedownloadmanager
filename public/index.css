@@ -2422,5 +2422,75 @@ body.theme-japan {
   pointer-events: none;
 }
 
+/* Star Favorite Buttons */
+.btn-star-fav {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: transform 0.2s ease, color 0.2s ease;
+  line-height: 1;
+  user-select: none;
+}
+.btn-star-fav:hover {
+  transform: scale(1.25);
+}
+.btn-star-fav.active {
+  color: #fbbf24;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.5));
+}
+.btn-secondary.fav-active {
+  background: rgba(251, 191, 36, 0.15) !important;
+  border-color: rgba(251, 191, 36, 0.4) !important;
+  color: #fbbf24 !important;
+}
+
+/* Collection Cards */
+.collection-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: var(--transition-fast);
+}
+.collection-card:hover {
+  border-color: var(--border-color-hover);
+  box-shadow: var(--shadow-md);
+}
+.collection-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.collection-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 4px 0;
+}
+.collection-card-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+}
+.collection-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.collection-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
 
 

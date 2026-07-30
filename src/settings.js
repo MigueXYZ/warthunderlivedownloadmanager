@@ -24,8 +24,11 @@ function loadSettings() {
   if (!settings.sightsPath) {
     settings.sightsPath = autoDetectUserSightsPath();
   }
-  if (!settings.tempPath) {
-    settings.tempPath = path.join(baseDir, 'temp');
+  if (!Array.isArray(settings.favorites)) {
+    settings.favorites = [];
+  }
+  if (!Array.isArray(settings.collections)) {
+    settings.collections = [];
   }
   return settings;
 }
