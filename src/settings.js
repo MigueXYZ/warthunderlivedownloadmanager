@@ -32,6 +32,12 @@ function loadSettings() {
   if (!settings.sightsPath) {
     settings.sightsPath = autoDetectUserSightsPath();
   }
+  if (settings.sightsPath && !settings.sightsPath.includes('production')) {
+    const prodCheck = path.join(path.dirname(settings.sightsPath), 'production', 'UserSights');
+    if (fs.existsSync(prodCheck)) {
+      settings.sightsPath = prodCheck;
+    }
+  }
   if (!settings.tempPath || settings.tempPath.includes('Program Files')) {
     settings.tempPath = getDefaultTempPath();
   }
@@ -49,6 +55,12 @@ function saveSettings(settings) {
   try {
     if (settings.wtPath && fs.existsSync(path.join(settings.wtPath, 'War Thunder'))) {
       settings.wtPath = path.join(settings.wtPath, 'War Thunder');
+    }
+    if (settings.sightsPath && !settings.sightsPath.includes('production')) {
+      const prodCheck = path.join(path.dirname(settings.sightsPath), 'production', 'UserSights');
+      if (fs.existsSync(prodCheck)) {
+        settings.sightsPath = prodCheck;
+      }
     }
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
   } catch (e) {
@@ -94,8 +106,14 @@ function autoDetectUserSightsPath() {
         for (const file of files) {
           const fullPath = path.join(savesPath, file);
           if (fs.statSync(fullPath).isDirectory() && /^\d+$/.test(file)) {
+            const prodSightsPath = path.join(fullPath, 'production', 'UserSights');
+            if (fs.existsSync(prodSightsPath)) {
+              return prodSightsPath;
+            }
             const userSightsPath = path.join(fullPath, 'UserSights');
-            return userSightsPath;
+            if (fs.existsSync(userSightsPath)) {
+              return userSightsPath;
+            }
           }
         }
       } catch (e) {
