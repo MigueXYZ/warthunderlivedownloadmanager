@@ -840,6 +840,28 @@ select:focus {
   opacity: 0;
 }
 
+#settings-overlay,
+#storage-overlay,
+#logs-overlay {
+  z-index: 1000;
+}
+
+#mod-details-overlay {
+  z-index: 1100;
+}
+
+#cookie-overlay {
+  z-index: 1500 !important;
+}
+
+#lightbox-overlay {
+  z-index: 2000;
+}
+
+#install-overlay {
+  z-index: 3000;
+}
+
 .overlay-card {
   background: var(--bg-sidebar);
   border: 1px solid var(--border-color);

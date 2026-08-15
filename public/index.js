@@ -3108,7 +3108,8 @@ function openCookieModal() {
 }
 
 // Close the cookie instructions modal
-function closeCookieModal() {
+function closeCookieModal(event) {
+  if (event && event.target !== event.currentTarget) return;
   if (elements.cookieOverlay) {
     elements.cookieOverlay.classList.add('hidden');
   }
