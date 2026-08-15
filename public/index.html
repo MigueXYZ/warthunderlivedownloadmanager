@@ -316,21 +316,44 @@
   <div class="overlay hidden" id="lightbox-overlay" onclick="closeLightbox()">
     <span class="close-btn" onclick="closeLightbox()">&times;</span>
     
-    <!-- Navigation Buttons -->
-    <button class="lightbox-btn prev" id="lightbox-prev" onclick="changeLightboxImage(-1, event)">‹</button>
+    <!-- Top Bar: Post Details & Navigation -->
+    <div class="lightbox-header" onclick="event.stopPropagation()">
+      <div class="lightbox-post-meta">
+        <span class="lightbox-post-badge" id="lightbox-post-badge">Post 1 of 20</span>
+        <h3 class="lightbox-post-title" id="lightbox-post-title">Modification Title</h3>
+        <span class="lightbox-post-author" id="lightbox-post-author">by Author</span>
+      </div>
+      <div class="lightbox-post-nav">
+        <button class="control-icon-btn" id="lightbox-post-prev-btn" onclick="navigateLightboxPost(-1, event)" title="Previous Post (Left Arrow ◀)">◀ Prev Post</button>
+        <span class="lightbox-photo-counter" id="lightbox-photo-counter">Photo 1/1</span>
+        <button class="control-icon-btn" id="lightbox-post-next-btn" onclick="navigateLightboxPost(1, event)" title="Next Post (Right Arrow ▶)">Next Post ▶</button>
+      </div>
+    </div>
+    
+    <!-- Photo Navigation Buttons -->
+    <button class="lightbox-btn prev" id="lightbox-prev" onclick="changeLightboxImage(-1, event)" title="Previous Photo (Shift + ◀)">‹</button>
     
     <div class="lightbox-container" onclick="event.stopPropagation()">
       <img id="lightbox-img" src="" alt="Fullscreen Preview" style="transform: scale(1) translate(0, 0); cursor: default; transition: transform 0.1s ease-out;">
     </div>
     
-    <button class="lightbox-btn next" id="lightbox-next" onclick="changeLightboxImage(1, event)">›</button>
+    <button class="lightbox-btn next" id="lightbox-next" onclick="changeLightboxImage(1, event)" title="Next Photo (Shift + ▶)">›</button>
     
-    <!-- Controls (Zoom Indicator / Actions) -->
-    <div class="lightbox-controls" onclick="event.stopPropagation()">
-      <button class="control-icon-btn" onclick="zoomLightbox(0.2, event)">➕ Zoom In</button>
-      <span class="zoom-value" id="lightbox-zoom-val">100%</span>
-      <button class="control-icon-btn" onclick="zoomLightbox(-0.2, event)">➖ Zoom Out</button>
-      <button class="control-icon-btn" onclick="resetLightboxZoom(event)">🔄 Reset</button>
+    <!-- Bottom Controls (Zoom Indicator / Actions & Hotkey Guide) -->
+    <div class="lightbox-bottom-bar" onclick="event.stopPropagation()">
+      <div class="lightbox-controls">
+        <button class="control-icon-btn" onclick="zoomLightbox(0.2, event)" title="Zoom In (+)">➕ Zoom In</button>
+        <span class="zoom-value" id="lightbox-zoom-val">100%</span>
+        <button class="control-icon-btn" onclick="zoomLightbox(-0.2, event)" title="Zoom Out (-)">➖ Zoom Out</button>
+        <button class="control-icon-btn" onclick="resetLightboxZoom(event)" title="Reset Zoom (0)">🔄 Reset</button>
+      </div>
+      <div class="lightbox-hotkeys-hint">
+        <span>⌨️ <strong>◀ / ▶</strong> Trocar Post</span>
+        <span class="hint-divider">•</span>
+        <span><strong>⇧ Shift + ◀ / ▶</strong> Trocar Foto</span>
+        <span class="hint-divider">•</span>
+        <span><strong>Esc</strong> Fechar</span>
+      </div>
     </div>
   </div>
 

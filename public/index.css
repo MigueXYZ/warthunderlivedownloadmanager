@@ -1087,9 +1087,8 @@ select:focus {
 }
 
 .lightbox-controls {
-  position: absolute;
-  bottom: 30px;
-  background: rgba(20, 22, 26, 0.75);
+  position: relative;
+  background: rgba(20, 22, 26, 0.85);
   border: 1px solid var(--border-color);
   backdrop-filter: blur(12px);
   padding: 8px 16px;
@@ -1097,8 +1096,123 @@ select:focus {
   display: flex;
   align-items: center;
   gap: 16px;
-  z-index: 2100;
   box-shadow: var(--shadow-sm);
+}
+
+/* Lightbox Top Header */
+.lightbox-header {
+  position: absolute;
+  top: 24px;
+  left: 40px;
+  right: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  z-index: 2100;
+  pointer-events: auto;
+}
+
+.lightbox-post-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 65%;
+  background: rgba(20, 22, 26, 0.75);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(12px);
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+.lightbox-post-badge {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.lightbox-post-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-family-display);
+}
+
+.lightbox-post-author {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.lightbox-post-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(20, 22, 26, 0.75);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(12px);
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+.lightbox-photo-counter {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-secondary);
+  padding: 0 4px;
+}
+
+/* Lightbox Bottom Bar */
+.lightbox-bottom-bar {
+  position: absolute;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 2100;
+  pointer-events: auto;
+}
+
+.lightbox-hotkeys-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(11, 12, 16, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px 14px;
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+}
+
+.lightbox-hotkeys-hint strong {
+  color: var(--accent-primary);
+}
+
+.hint-divider {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Feed Card Keyboard Focus Indicator */
+.card.keyboard-focused,
+.lib-card.keyboard-focused {
+  outline: 2px solid var(--accent-primary) !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.35) !important;
+  transform: translateY(-4px);
 }
 
 .control-icon-btn {

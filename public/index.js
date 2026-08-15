@@ -197,24 +197,115 @@ function setupEventListeners() {
     }
   });
   
-  // Close modals on Escape keypress
+  // Global Keyboard Shortcuts (Hotkeys for Post & Photo navigation, modal dismissal, etc.)
   window.addEventListener('keydown', (e) => {
+    // 1. Escape key closes any active overlay/modal
     if (e.key === 'Escape') {
       if (elements.lightboxOverlay && !elements.lightboxOverlay.classList.contains('hidden')) {
         closeLightbox();
+        return;
+      }
+      const modDetailsOverlay = document.getElementById('mod-details-overlay');
+      if (modDetailsOverlay && !modDetailsOverlay.classList.contains('hidden')) {
+        closeModDetailsModal();
+        return;
       }
       if (elements.cookieOverlay && !elements.cookieOverlay.classList.contains('hidden')) {
         closeCookieModal();
+        return;
       }
       if (elements.settingsOverlay && !elements.settingsOverlay.classList.contains('hidden')) {
         closeSettingsModal();
+        return;
       }
       const storageOverlay = document.getElementById('storage-overlay');
       if (storageOverlay && !storageOverlay.classList.contains('hidden')) {
         closeStorageModal();
+        return;
       }
       if (elements.logsOverlay && !elements.logsOverlay.classList.contains('hidden')) {
         closeLogsModal();
+        return;
+      }
+    }
+
+    // Do NOT trigger navigation hotkeys if the user is currently typing in an input or textarea
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable)) {
+      return;
+    }
+
+    const isShift = e.shiftKey;
+
+    // 2. Lightbox is currently OPEN
+    if (elements.lightboxOverlay && !elements.lightboxOverlay.classList.contains('hidden')) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        
+        if (isShift || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          // Shift + Arrow (or Up/Down) -> Switch Photo (Image within current post)
+          const dir = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 1;
+          changeLightboxImage(dir, e);
+        } else {
+          // Plain Arrow Left / Right -> Switch to Previous / Next Post
+          const dir = e.key === 'ArrowLeft' ? -1 : 1;
+          navigateLightboxPost(dir, e);
+        }
+        return;
+      }
+
+      // Plus / Minus for zoom
+      if (e.key === '+' || e.key === '=') {
+        zoomLightbox(0.2, e);
+      } else if (e.key === '-' || e.key === '_') {
+        zoomLightbox(-0.2, e);
+      } else if (e.key === '0') {
+        resetLightboxZoom(e);
+      }
+      return;
+    }
+
+    // 3. Mod Details Modal is currently OPEN
+    const modDetailsOverlay = document.getElementById('mod-details-overlay');
+    if (modDetailsOverlay && !modDetailsOverlay.classList.contains('hidden')) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const dir = e.key === 'ArrowLeft' ? -1 : 1;
+        if (isShift) {
+          // Shift + Left/Right -> Switch photo in carousel
+          const prevNextBtn = dir === -1 ? modDetailsOverlay.querySelector('.gallery-btn.prev') : modDetailsOverlay.querySelector('.gallery-btn.next');
+          if (prevNextBtn) changeCardImage(prevNextBtn, dir, e);
+        } else {
+          // Left/Right -> Switch to Previous / Next installed mod
+          navigateModDetails(dir, e);
+        }
+        return;
+      }
+      return;
+    }
+
+    // 4. Feed Grid / Library Grid browsing (when no modal is open)
+    if (state.activeTab === 'browse') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (isShift) {
+          // Shift + Arrow -> Cycle images in focused/hovered card
+          cycleFocusedCardImage(e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1);
+        } else {
+          // Arrow -> Move card focus
+          const dir = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 1;
+          navigateFeedCards(dir);
+        }
+        return;
+      }
+      if (e.key === 'Enter') {
+        openFocusedCardLightbox(e);
+      }
+    } else if (state.activeTab === 'library') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const dir = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 1;
+        navigateLibraryCards(dir);
       }
     }
   });
@@ -959,16 +1050,19 @@ function getPostTitle(item) {
 function renderCards(list) {
   elements.resultsGrid.innerHTML = '';
   
-  if (list.length === 0) {
+  const validList = list.filter(item => item && item.file);
+  state.currentDisplayedList = validList;
+
+  if (validList.length === 0) {
     elements.resultsGrid.innerHTML = `<div class="info-text" style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">No modifications found. Try adjusting your search query.</div>`;
     return;
   }
   
-  list.forEach(item => {
-    if (!item.file) return;
-    
+  validList.forEach((item, idx) => {
     const card = document.createElement('div');
     card.className = 'card';
+    card.setAttribute('data-post-index', idx);
+    card.setAttribute('data-post-id', item.id);
     
     const likes = item.likes || 0;
     const views = item.views || 0;
@@ -1016,15 +1110,18 @@ function renderCards(list) {
     let dotsHtml = '';
     if (hasMultipleImages) {
       dotsHtml = `<div class="gallery-dots">`;
-      imagesList.forEach((_, idx) => {
-        dotsHtml += `<span class="gallery-dot ${idx === 0 ? 'active' : ''}"></span>`;
+      imagesList.forEach((_, imgIdx) => {
+        dotsHtml += `<span class="gallery-dot ${imgIdx === 0 ? 'active' : ''}"></span>`;
       });
       dotsHtml += `</div>`;
     }
+
+    const safeTitle = cleanModName.replace(/'/g, "\\'");
+    const safeAuthor = (item.author && item.author.nickname ? item.author.nickname : '').replace(/'/g, "\\'");
     
     card.innerHTML = `
       <div class="card-media" data-images='${JSON.stringify(imagesList)}' data-index="0">
-        <img class="card-img" src="${imageUrl}" alt="${item.file.name}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=Error+Loading'" onclick="openFullscreenImage(this.src, JSON.parse(this.parentNode.getAttribute('data-images')), parseInt(this.parentNode.getAttribute('data-index'), 10), event)">
+        <img class="card-img" src="${imageUrl}" alt="${item.file.name}" onerror="this.src='https://placehold.co/600x400/111317/fff?text=Error+Loading'" onclick="openFullscreenImage(this.src, JSON.parse(this.parentNode.getAttribute('data-images')), parseInt(this.parentNode.getAttribute('data-index'), 10), event, { postId: ${item.id}, postIndex: ${idx}, postTitle: '${safeTitle}', author: '${safeAuthor}' })">
         
         ${hasMultipleImages ? `
           <button class="gallery-btn prev" onclick="changeCardImage(this, -1, event)">‹</button>
@@ -1076,12 +1173,14 @@ function renderCards(list) {
 
 // Inline image switcher inside each feed card
 window.changeCardImage = function(btn, dir, event) {
-  event.stopPropagation(); // Prevent card clicks or fullscreen opening
+  if (event && event.stopPropagation) event.stopPropagation();
   
   const mediaContainer = btn.closest('.card-media, .lib-card-media');
+  if (!mediaContainer) return;
   const img = mediaContainer.querySelector('.card-img, img');
-  const images = JSON.parse(mediaContainer.getAttribute('data-images'));
-  let index = parseInt(mediaContainer.getAttribute('data-index'), 10);
+  const images = JSON.parse(mediaContainer.getAttribute('data-images') || '[]');
+  if (!images || images.length === 0) return;
+  let index = parseInt(mediaContainer.getAttribute('data-index') || '0', 10);
   
   index = (index + dir + images.length) % images.length;
   mediaContainer.setAttribute('data-index', index);
@@ -1109,18 +1208,32 @@ window.toggleDescription = function(descId, btn) {
 };
 
 // Fullscreen Image Lightbox Functions
-window.openFullscreenImage = function(src, imagesList, currentIndex, event) {
-  if (event) event.stopPropagation();
+window.openFullscreenImage = function(src, imagesList, currentIndex, event, meta = {}) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  
+  let postIndex = meta.postIndex !== undefined ? meta.postIndex : -1;
+  let postId = meta.postId || null;
+  
+  if (postIndex === -1 && postId && state.currentDisplayedList) {
+    postIndex = state.currentDisplayedList.findIndex(item => item.id === postId);
+  }
   
   state.lightbox = {
-    images: imagesList || [src],
+    images: imagesList && imagesList.length > 0 ? imagesList : [src],
     index: currentIndex || 0,
     scale: 1,
     translateX: 0,
     translateY: 0,
     isDragging: false,
     startX: 0,
-    startY: 0
+    startY: 0,
+    postIndex: postIndex,
+    postId: postId,
+    postTitle: meta.postTitle || '',
+    postAuthor: meta.author || '',
+    isLibrary: meta.isLibrary || false,
+    libType: meta.type || 'camouflage',
+    libModName: meta.modName || ''
   };
   
   updateLightboxUI();
@@ -1134,9 +1247,16 @@ window.closeLightbox = function() {
   }
 };
 
+// Switch Photo (Image within current post)
 window.changeLightboxImage = function(dir, event) {
-  if (event) event.stopPropagation();
-  if (!state.lightbox || state.lightbox.images.length <= 1) return;
+  if (event && event.stopPropagation) event.stopPropagation();
+  if (!state.lightbox) return;
+  
+  if (state.lightbox.images.length <= 1) {
+    // If only 1 image exists in this post, navigate to the next/prev post smoothly
+    navigateLightboxPost(dir, event);
+    return;
+  }
   
   state.lightbox.index = (state.lightbox.index + dir + state.lightbox.images.length) % state.lightbox.images.length;
   state.lightbox.scale = 1;
@@ -1146,8 +1266,77 @@ window.changeLightboxImage = function(dir, event) {
   updateLightboxUI();
 };
 
+// Switch Post (Next/Previous Post in Feed or Library)
+window.navigateLightboxPost = function(dir, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  if (!state.lightbox) return;
+
+  if (state.lightbox.isLibrary) {
+    const list = state.lightbox.libType === 'camouflage' ? state.installedList.skins : state.installedList.sights;
+    if (!list || list.length <= 1) return;
+    let idx = list.findIndex(m => m.name === state.lightbox.libModName);
+    if (idx === -1) idx = 0;
+    idx = (idx + dir + list.length) % list.length;
+    const nextMod = list[idx];
+    if (nextMod) {
+      const metadata = nextMod.metadata || {};
+      const displayTitle = metadata.title || cleanFilename(metadata.fileName || nextMod.name);
+      const imageUrl = metadata.image || 'https://placehold.co/600x400/111317/fff?text=No+Preview';
+      const imagesList = (metadata.images && metadata.images.length > 0) ? metadata.images.map(img => img.src) : [imageUrl];
+      
+      state.lightbox.images = imagesList;
+      state.lightbox.index = 0;
+      state.lightbox.scale = 1;
+      state.lightbox.translateX = 0;
+      state.lightbox.translateY = 0;
+      state.lightbox.libModName = nextMod.name;
+      state.lightbox.postTitle = displayTitle;
+      state.lightbox.postAuthor = metadata.author ? metadata.author.nickname : '';
+      updateLightboxUI();
+    }
+    return;
+  }
+
+  // Browse Feed Navigation
+  const feed = state.currentDisplayedList || state.currentFeedList || [];
+  if (!feed || feed.length === 0) return;
+
+  let nextIndex = state.lightbox.postIndex;
+  if (nextIndex === -1 && state.lightbox.postId) {
+    nextIndex = feed.findIndex(item => item.id === state.lightbox.postId);
+  }
+  if (nextIndex === -1) nextIndex = 0;
+
+  nextIndex = (nextIndex + dir + feed.length) % feed.length;
+
+  const nextPost = feed[nextIndex];
+  if (!nextPost) return;
+
+  const imageUrl = (nextPost.images && nextPost.images.length > 0) ? nextPost.images[0].src : 'https://placehold.co/600x400/111317/fff?text=No+Preview';
+  const imagesList = (nextPost.images && nextPost.images.length > 0) ? nextPost.images.map(img => img.src) : [imageUrl];
+  const postTitle = getPostTitle(nextPost);
+
+  state.lightbox.images = imagesList;
+  state.lightbox.index = 0;
+  state.lightbox.scale = 1;
+  state.lightbox.translateX = 0;
+  state.lightbox.translateY = 0;
+  state.lightbox.postIndex = nextIndex;
+  state.lightbox.postId = nextPost.id;
+  state.lightbox.postTitle = postTitle;
+  state.lightbox.postAuthor = nextPost.author ? nextPost.author.nickname : '';
+
+  updateLightboxUI();
+
+  // Also sync highlight on feed card in background
+  const cards = Array.from(elements.resultsGrid.querySelectorAll('.card'));
+  cards.forEach((c, i) => {
+    c.classList.toggle('keyboard-focused', i === nextIndex);
+  });
+};
+
 window.zoomLightbox = function(amount, event) {
-  if (event) event.stopPropagation();
+  if (event && event.stopPropagation) event.stopPropagation();
   if (!state.lightbox) return;
   
   state.lightbox.scale = Math.max(0.5, Math.min(4, state.lightbox.scale + amount));
@@ -1155,7 +1344,7 @@ window.zoomLightbox = function(amount, event) {
 };
 
 window.resetLightboxZoom = function(event) {
-  if (event) event.stopPropagation();
+  if (event && event.stopPropagation) event.stopPropagation();
   if (!state.lightbox) return;
   
   state.lightbox.scale = 1;
@@ -1165,8 +1354,34 @@ window.resetLightboxZoom = function(event) {
 };
 
 function updateLightboxUI() {
+  if (!state.lightbox) return;
   const imgUrl = state.lightbox.images[state.lightbox.index];
   elements.lightboxImg.src = imgUrl;
+
+  const badgeEl = document.getElementById('lightbox-post-badge');
+  const titleEl = document.getElementById('lightbox-post-title');
+  const authorEl = document.getElementById('lightbox-post-author');
+  const photoCounterEl = document.getElementById('lightbox-photo-counter');
+
+  const totalImages = state.lightbox.images.length;
+  const currentImgNum = state.lightbox.index + 1;
+
+  if (photoCounterEl) {
+    photoCounterEl.innerText = `Photo ${currentImgNum}/${totalImages}`;
+  }
+
+  if (state.lightbox.isLibrary) {
+    if (badgeEl) badgeEl.innerText = `Library (${state.lightbox.libType === 'camouflage' ? 'Skin' : 'Sight'})`;
+    if (titleEl) titleEl.innerText = state.lightbox.postTitle || 'Modification';
+    if (authorEl) authorEl.innerText = state.lightbox.postAuthor ? `by ${state.lightbox.postAuthor}` : '';
+  } else {
+    const feed = state.currentDisplayedList || state.currentFeedList || [];
+    const totalPosts = feed.length;
+    const currentPostNum = state.lightbox.postIndex >= 0 ? state.lightbox.postIndex + 1 : 1;
+    if (badgeEl) badgeEl.innerText = totalPosts > 0 ? `Post ${currentPostNum} of ${totalPosts}` : 'WT Live Post';
+    if (titleEl) titleEl.innerText = state.lightbox.postTitle || 'Modification';
+    if (authorEl) authorEl.innerText = state.lightbox.postAuthor ? `by ${state.lightbox.postAuthor}` : '';
+  }
   
   // Show/hide navigation arrows based on count of images
   const prevBtn = document.getElementById('lightbox-prev');
@@ -1192,6 +1407,59 @@ function updateLightboxTransform() {
   } else {
     elements.lightboxImg.style.cursor = 'default';
   }
+}
+
+// Feed card keyboard navigation helpers
+function navigateFeedCards(dir) {
+  const cards = Array.from(elements.resultsGrid.querySelectorAll('.card'));
+  if (cards.length === 0) return;
+
+  let currentIndex = cards.findIndex(c => c.classList.contains('keyboard-focused'));
+  
+  if (currentIndex === -1) {
+    currentIndex = dir > 0 ? 0 : cards.length - 1;
+  } else {
+    cards[currentIndex].classList.remove('keyboard-focused');
+    currentIndex = (currentIndex + dir + cards.length) % cards.length;
+  }
+
+  const targetCard = cards[currentIndex];
+  targetCard.classList.add('keyboard-focused');
+  targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cycleFocusedCardImage(dir) {
+  const focusedCard = elements.resultsGrid.querySelector('.card.keyboard-focused') || elements.resultsGrid.querySelector('.card:hover');
+  if (!focusedCard) return;
+  const prevNextBtn = dir === -1 ? focusedCard.querySelector('.gallery-btn.prev') : focusedCard.querySelector('.gallery-btn.next');
+  if (prevNextBtn) {
+    changeCardImage(prevNextBtn, dir, { stopPropagation: () => {} });
+  }
+}
+
+function openFocusedCardLightbox(e) {
+  const focusedCard = elements.resultsGrid.querySelector('.card.keyboard-focused');
+  if (!focusedCard) return;
+  const img = focusedCard.querySelector('.card-img');
+  if (img) img.click();
+}
+
+function navigateLibraryCards(dir) {
+  const container = state.contentType === 'camouflage' ? elements.skinsList : elements.sightsList;
+  const cards = Array.from(container.querySelectorAll('.lib-card')).filter(c => c.style.display !== 'none');
+  if (cards.length === 0) return;
+
+  let currentIndex = cards.findIndex(c => c.classList.contains('keyboard-focused'));
+  if (currentIndex === -1) {
+    currentIndex = dir > 0 ? 0 : cards.length - 1;
+  } else {
+    cards[currentIndex].classList.remove('keyboard-focused');
+    currentIndex = (currentIndex + dir + cards.length) % cards.length;
+  }
+
+  const targetCard = cards[currentIndex];
+  targetCard.classList.add('keyboard-focused');
+  targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function isModInstalled(item) {
@@ -2884,6 +3152,8 @@ window.openModDetailsModal = function(type, name) {
     showToast('Modification not found.', 'error');
     return;
   }
+
+  state.activeModDetails = { type, name };
   
   const metadata = mod.metadata || {};
   const displayTitle = metadata.title || cleanFilename(metadata.fileName || mod.name);
@@ -2934,9 +3204,13 @@ window.openModDetailsModal = function(type, name) {
     dotsHtml += `</div>`;
   }
 
+  const safeDisplayTitle = displayTitle.replace(/'/g, "\\'");
+  const safeAuthorNickname = (metadata.author && metadata.author.nickname ? metadata.author.nickname : '').replace(/'/g, "\\'");
+  const safeModName = name.replace(/'/g, "\\'");
+
   const carouselHtml = `
     <div class="card-media" data-images='${JSON.stringify(imagesList)}' data-index="0" style="aspect-ratio: 16 / 9; border-radius: var(--radius-md); overflow: hidden; position: relative;">
-      <img class="card-img" src="${imageUrl}" alt="${displayTitle}" style="width: 100%; height: 100%; object-fit: cover; cursor: zoom-in;" onclick="openFullscreenImage(this.src, JSON.parse(this.parentNode.getAttribute('data-images')), parseInt(this.parentNode.getAttribute('data-index'), 10), event)">
+      <img class="card-img" src="${imageUrl}" alt="${displayTitle}" style="width: 100%; height: 100%; object-fit: cover; cursor: zoom-in;" onclick="openFullscreenImage(this.src, JSON.parse(this.parentNode.getAttribute('data-images')), parseInt(this.parentNode.getAttribute('data-index'), 10), event, { postTitle: '${safeDisplayTitle}', author: '${safeAuthorNickname}', isLibrary: true, type: '${type}', modName: '${safeModName}' })">
       ${hasMultipleImages ? `
         <button class="gallery-btn prev" onclick="changeCardImage(this, -1, event)" style="width: 32px; height: 32px; font-size: 18px; left: 12px; opacity: 1;">‹</button>
         ${dotsHtml}
@@ -2978,44 +3252,42 @@ window.openModDetailsModal = function(type, name) {
     
     ${carouselHtml}
     
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-top: 8px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
       ${authorHtml}
+      <span class="card-badge ${type === 'camouflage' ? '' : 'market'}" style="position: static;">${type === 'camouflage' ? 'Camouflage' : 'Sight'}</span>
+    </div>
+    
+    <div style="margin-top: 12px;">
       ${statsHtml}
     </div>
     
-    <div>
-      <h3 style="color: var(--accent-secondary); margin-bottom: 8px; font-family: var(--font-family-display); font-size: 14px; display: flex; align-items: center; gap: 6px;">
-        📄 Description
-      </h3>
-      <div style="max-height: 200px; overflow-y: auto; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; font-size: 12px; line-height: 1.5;">
+    <div style="margin-top: 16px;">
+      <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Description</h4>
+      <div class="card-desc" style="max-height: 180px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 13px; line-height: 1.5;">
         ${descriptionHtml}
       </div>
     </div>
     
-    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
-      <div>
-        <span style="color: var(--text-muted); display: block;">📂 Installation Path</span>
-        <strong style="word-break: break-all; color: var(--text-main); font-size: 11px; font-family: monospace;">${mod.path}</strong>
+    <div style="margin-top: 16px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 12px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span style="color: var(--text-muted);">Folder Name:</span>
+        <span style="font-family: monospace; color: var(--text-main); font-weight: 600;">${mod.name}</span>
       </div>
-      <div>
-        <span style="color: var(--text-muted); display: block;">📅 Installed At</span>
-        <strong style="color: var(--text-main);">${dateStr}</strong>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span style="color: var(--text-muted);">Installed Date:</span>
+        <span>${dateStr}</span>
       </div>
-      <div>
-        <span style="color: var(--text-muted); display: block;">🔍 Local Status</span>
-        <strong style="color: var(--text-main);">${blkStatus}</strong>
-        ${filesListHtml}
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span style="color: var(--text-muted);">Integrity / Files:</span>
+        <span>${blkStatus}</span>
       </div>
-      <div>
-        <span style="color: var(--text-muted); display: block;">🆔 WT Live Post ID</span>
-        <strong style="color: var(--text-main);">${metadata.postId || 'N/A (Pasted Link / Unknown)'}</strong>
-      </div>
+      ${filesListHtml}
     </div>
-
-    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 8px;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; gap: 12px;">
       <div style="display: flex; gap: 8px;">
         <button class="btn-toggle ${mod.disabled ? 'enable' : 'disable'}" onclick="toggleModActive('${type}', '${mod.name}'); closeModDetailsModal();" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); cursor: pointer;">
-          ${mod.disabled ? '🟢 Enable Mod' : '🔴 Disable Mod'}
+          ${mod.disabled ? '▶️ Enable Mod' : '⏸️ Disable Mod'}
         </button>
         <button class="btn-delete" onclick="deleteMod('${type}', '${mod.name}'); closeModDetailsModal();" style="padding: 8px 16px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); cursor: pointer;">
           🗑️ Delete Mod
@@ -3030,10 +3302,27 @@ window.openModDetailsModal = function(type, name) {
   document.getElementById('mod-details-overlay').classList.remove('hidden');
 };
 
+// Navigate between installed mods inside the details modal
+window.navigateModDetails = function(dir, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  if (!state.activeModDetails) return;
+  const { type, name } = state.activeModDetails;
+  const list = type === 'camouflage' ? state.installedList.skins : state.installedList.sights;
+  if (!list || list.length <= 1) return;
+  let idx = list.findIndex(m => m.name === name);
+  if (idx === -1) idx = 0;
+  idx = (idx + dir + list.length) % list.length;
+  const nextMod = list[idx];
+  if (nextMod) {
+    openModDetailsModal(type, nextMod.name);
+  }
+};
+
 // Close the Modification Details Modal
 window.closeModDetailsModal = function(event) {
   if (event && event.target !== event.currentTarget) return;
   document.getElementById('mod-details-overlay').classList.add('hidden');
+  state.activeModDetails = null;
 };
 
 // Play audio notification chime using Web Audio API
