@@ -1,6 +1,6 @@
 # War Thunder Live Downloader & Manager ✈️📦
 
-![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.5.1-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20x64-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
@@ -10,8 +10,9 @@ No more manual zip downloading, extracting, folder renaming, or permissions erro
 
 ---
 
-## ✨ Key Features (v1.5.0)
+## ✨ Key Features (v1.5.1)
 
+* ⌨️ **Keyboard Hotkeys Navigation**: Seamless post-switching with `◀ / ▶` Arrow keys and photo-browsing with `Shift + ◀ / ▶` in Fullscreen Lightbox, Mod Details, and Feed.
 * ⚡ **1-Click Auto-Updater**: Built-in update engine checks GitHub Releases automatically and installs app updates directly from the dashboard.
 * ⭐ **Favorites System**: Star any skin or sight from the live feed or installed library to build your personal collection and filter with `⭐ Favorites Only`.
 * 🎯 **Smart Auto-Detection**: Automatically scans all drive letters (`A-Z`) to find Steam and standalone War Thunder installations, as well as `production\UserSights` save folders.
