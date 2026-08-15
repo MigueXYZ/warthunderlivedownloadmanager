@@ -436,40 +436,51 @@
   <div class="overlay hidden" id="cookie-overlay" onclick="closeCookieModal(event)">
     <div class="overlay-card storage-card" style="max-width: 580px;" onclick="event.stopPropagation()">
       <div class="storage-modal-header">
-        <h2>🔑 Guia de Sessão / Token Gaijin (Opcional)</h2>
+        <h2>🔑 Como Obter o Token de Sessão Gaijin</h2>
         <button class="close-modal-btn" onclick="closeCookieModal()">&times;</button>
       </div>
       <div class="storage-modal-body" style="display: flex; flex-direction: column; gap: 16px; font-size: 13px; line-height: 1.5; color: var(--text-main); text-align: left;">
         <p style="background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.25); border-radius: var(--radius-sm); padding: 12px; margin: 0; color: var(--text-main);">
-          💡 <strong>Opcional:</strong> A app funciona a 100% sem qualquer token. O token apenas serve para contornar restrições no WT Live (ex: camuflagens históricas restritas ou conteúdos anime que exigem conta Gaijin ligada).
+          💡 <strong>Opcional:</strong> A app funciona perfeitamente sem qualquer token. O token apenas serve para contornar os filtros do WT Live e desbloquear camuflagens históricas restritas ou conteúdos anime que requerem conta Gaijin ligada.
         </p>
 
         <div>
-          <h3 style="color: var(--accent-primary); margin-bottom: 6px; font-family: var(--font-family-display);">⚡ Método Rápido (1 Clique via Consola)</h3>
-          <p style="margin-bottom: 8px; color: var(--text-muted);">
-            1. Abre o site <a href="https://live.warthunder.com" target="_blank" style="color: var(--accent-primary); text-decoration: underline;">live.warthunder.com</a> no navegador (com a tua conta ligada).<br>
-            2. Clica no botão <strong>📋 Copiar Script</strong> abaixo.<br>
-            3. No site da Gaijin, prime <strong>F12</strong>, vai à aba <strong>Consola</strong>, cola o script com <code>Ctrl+V</code> e prime <strong>Enter</strong>.<br>
-            4. Volta aqui e cola o valor no campo <em>Session Cookie</em> nas Definições!
-          </p>
-          <div style="position: relative; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 12px; font-family: monospace; font-size: 11px; word-break: break-all; color: var(--accent-primary); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-            <code id="cookie-code-snippet">(() => { const m = document.cookie.match(/(?:^|;\s*)(token|identity_sid)=([^;]+)/); if (m && m[2]) { copy(m[2]); alert('✅ Token copiado com sucesso! Agora cola-o nas Definições da app.'); } else { alert('⚠️ Não foi encontrado o token. Certifica-te de que tens sessão iniciada em live.warthunder.com!'); } })()</code>
-            <button class="btn-clean-single" style="flex-shrink: 0;" onclick="copyCookieSnippet()">📋 Copiar Script</button>
+          <h3 style="color: var(--accent-primary); margin-bottom: 8px; font-family: var(--font-family-display);">📋 Passo a Passo (Leva apenas 10 segundos):</h3>
+          
+          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+              <span style="background: var(--accent-primary); color: #000; font-weight: 700; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">1</span>
+              <div>Abre o site <a href="https://live.warthunder.com" target="_blank" style="color: var(--accent-primary); text-decoration: underline; font-weight: 600;">live.warthunder.com</a> no navegador com a tua sessão iniciada.</div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+              <span style="background: var(--accent-primary); color: #000; font-weight: 700; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">2</span>
+              <div>Prime <kbd style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; font-family: monospace;">F12</kbd> (ou clique direito ➔ Inspecionar) para abrir as Ferramentas de Programador.</div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+              <span style="background: var(--accent-primary); color: #000; font-weight: 700; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">3</span>
+              <div>Vai ao separador <strong>Aplicação / Armazenamento (Application / Storage)</strong> no topo.</div>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+              <span style="background: var(--accent-primary); color: #000; font-weight: 700; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">4</span>
+              <div>Na coluna à esquerda, expande <strong>Cookies</strong> ➔ clica em <code style="color: var(--accent-secondary);">https://live.warthunder.com</code>.</div>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+              <span style="background: var(--accent-primary); color: #000; font-weight: 700; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">5</span>
+              <div>Na tabela, clica duas vezes no valor da linha <strong>token</strong> (ou <strong>identity_sid</strong>), copia com <kbd style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+C</kbd> e cola no campo das Definições!</div>
+            </div>
           </div>
         </div>
 
-        <div style="border-top: 1px solid var(--border-color); padding-top: 12px;">
-          <h3 style="color: var(--text-muted); margin-bottom: 6px; font-family: var(--font-family-display);">🛠️ Método Manual (Sem correr código)</h3>
-          <ol style="margin-left: 20px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">
-            <li>No site <a href="https://live.warthunder.com" target="_blank" style="color: var(--accent-primary); text-decoration: underline;">live.warthunder.com</a>, prime <strong>F12</strong> (Ferramentas de Programador).</li>
-            <li>Acede ao separador <strong>Application</strong> (Chrome/Edge/Brave) ou <strong>Storage</strong> (Firefox).</li>
-            <li>No menu lateral esquerdo, abre <strong>Cookies</strong> ➔ <code>https://live.warthunder.com</code>.</li>
-            <li>Procura a linha com o nome <strong>token</strong> (ou <strong>identity_sid</strong>) e copia o seu <strong>Value</strong>.</li>
-          </ol>
+        <div style="font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          🔒 <em>Nota de Segurança: A Gaijin marca este cookie com a proteção <code>HttpOnly</code> para proteger a tua conta, pelo que o navegador bloqueia a leitura direta por scripts de consola por questões de segurança.</em>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-          <button class="btn-secondary" onclick="closeCookieModal()">Fechar</button>
+        <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+          <button class="btn-primary" onclick="closeCookieModal()" style="padding: 8px 24px;">Entendido!</button>
         </div>
       </div>
     </div>
